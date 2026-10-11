@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import unittest
+from unittest.mock import patch
 from linux_desktop import X11Windows, configure_qt_platform, display_error, visible_top_segments, map_top_segments, parse_gnome_snapshot, GnomeWindows
 
 
@@ -81,6 +82,57 @@ class GnomeBridgeTests(unittest.TestCase):
         screens = [("eDP-1", 0, 0, 1920, 1080), ("HDMI-1", 1920, 0, 1280, 720)]
         self.assertEqual(parse_gnome_snapshot(payload, screens=screens)[0]["rect"],
                          (1960, 100, 2160, 350))
+
+    def test_ambiguous_xwayland_aliases_and_reused_screen_are_rejected(self):
+        monitors = [{"names": [], "rect": [0, 0, 1920, 1080]},
+                    {"names": [], "rect": [1920, 0, 1280, 720]}]
+        payload = {"version": 1, "monitors": monitors, "windows": []}
+        screens = [("XWAYLAND0", 0, 0, 2400, 1350), ("XWAYLAND1", 2400, 0, 2560, 1440)]
+        with self.assertRaisesRegex(ValueError, 'monitor mapping'):
+            parse_gnome_snapshot(json.dumps(payload), screens=screens)
+        monitors[0]['names'] = ['XWAYLAND0']
+        monitors[1]['names'] = ['XWAYLAND0']
+        with self.assertRaisesRegex(ValueError, 'monitor mapping'):
+            parse_gnome_snapshot(json.dumps(payload), screens=screens)
+
+    def test_exact_monitor_geometry_matches_unrecognized_names(self):
+        payload = json.dumps({"version": 1,
+            "monitors": [{"names": [], "rect": [0, 0, 1920, 1080]},
+                         {"names": [], "rect": [1920, 0, 1280, 720]}],
+            "windows": [{"id": "session:1", "rect": [2000, 100, 2400, 500]}]})
+        screens = [("XWAYLAND0", 0, 0, 1920, 1080), ("XWAYLAND1", 1920, 0, 1280, 720)]
+        self.assertEqual(parse_gnome_snapshot(payload, scale=2, screens=screens)[0]['rect'],
+                         (2000, 100, 2400, 500))
+
+    def test_async_reply_uses_saved_request_scale(self):
+        class Signal:
+            def connect(self, callback): self.callback = callback
+        class Reply:
+            def arguments(self): return ['{"version":1,"windows":[]}']
+        class Watcher:
+            finished = Signal()
+            def __init__(self, call): pass
+            def isError(self): return False
+            def reply(self): return Reply()
+            def deleteLater(self): pass
+        class PidReply:
+            def isValid(self): return True
+            def value(self): return os.getpid() + 10000
+        class Connection:
+            def baseService(self): return ':test.1'
+            def interface(self): return self
+            def servicePid(self, name): return PidReply()
+            def isConnected(self): return True
+            def asyncCall(self, message, timeout): return object()
+        backend = GnomeWindows()
+        with patch('PySide6.QtCore.QCoreApplication.instance', return_value=object()), patch(
+                'PySide6.QtDBus.QDBusConnection.sessionBus', return_value=Connection()), patch(
+                'PySide6.QtDBus.QDBusPendingCallWatcher', Watcher):
+            backend.snapshots(scale=2, screens=())
+        self.assertEqual(backend.scale, 2)
+        with patch('linux_desktop.parse_gnome_snapshot', return_value=[]) as parser:
+            backend._finished()
+        parser.assert_called_once_with('{"version":1,"windows":[]}', os.getpid() + 10000, scale=2, screens=())
 
     def test_invalid_protocol_and_geometry_never_enter_physics(self):
         for payload in ('[]', '{}', '{"version":2,"windows":[]}'):

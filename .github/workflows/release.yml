@@ -1,4 +1,4 @@
-name: Publish v1.2.0
+name: Publish v1.2.1
 on:
   push:
     branches: [main]
@@ -8,7 +8,7 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: publish-v1.2.0
+  group: publish-v1.2.1
   cancel-in-progress: false
 jobs:
   release:
@@ -72,22 +72,24 @@ jobs:
       - name: Publish release with both tested binaries
         run: |
           cat > release/notes.md <<'NOTES'
-          Renamed to **Why-the-Mouse-Jump-Onto-My-Head-67**.
+          **GNOME Wayland window interaction** for Why-the-Mouse-Jump-Onto-My-Head-67.
 
-          - Ubuntu/Linux and Windows portable downloads include offline AI subject detection for PNG/JPG imports.
-          - The default pet and application icon now use the selected hamster image.
-          - Stable resting collisions, visible sprites reaching all four screen edges, and interaction with moving X11/XWayland windows.
-          - Updated Ubuntu installation, desktop shortcut, troubleshooting and image-import instructions.
-          - Existing Naiwa settings migrate on first launch. The source entry point remains `naiwa.py`.
+          - A read-only GNOME Shell extension supplies native Wayland window geometry to the desktop pet.
+          - Pets land on native windows, interact with their edges, and release supports when windows minimize or close.
+          - Portable app settings no longer redirect GNOME extension and desktop shortcut installation to the app's private data directory.
+          - Setup distinguishes installed files from a connected bridge. Existing pet processes reconnect automatically after the extension is enabled.
+          - Monitor mapping rejects ambiguous multi-monitor coordinates and falls back to X11 with an explicit status instead of producing incorrect collisions.
 
-          **Ubuntu:** extract the Linux archive and run `bash start.sh`; follow the attached `UBUNTU.md` for dependencies and desktop installation.
-          **Windows:** extract the Windows ZIP and run `Why-the-Mouse-Jump-Onto-My-Head-67.exe`.
+          **First installation on GNOME 45–50:** extract the Linux archive, run `bash start.sh --install-gnome-bridge`, save work and log out/in if GNOME has not discovered the extension, then run `gnome-extensions enable window-geometry@desktoppets.local`. Run `bash start.sh --doctor` and confirm `GNOME bridge: connected`.
 
-          Native Wayland window bridging is optional and remains unverified. X11/XWayland window interaction is verified.
+          The pet continues to use XWayland for its transparent overlay. Native window geometry is provided by the GNOME extension. Other Wayland compositors need their own integration; X11/XWayland fallback remains available.
+
+          Linux and Windows downloads retain the hamster default and offline AI PNG/JPG imports.
+
           NOTES
-          if gh release view v1.2.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload v1.2.0 release/*-Linux-x64.tar.gz release/*-Windows-x64.zip release/UBUNTU.md --clobber --repo "$GITHUB_REPOSITORY"
-            gh release edit v1.2.0 --title "Why-the-Mouse-Jump-Onto-My-Head-67 v1.2.0" --notes-file release/notes.md --latest --repo "$GITHUB_REPOSITORY"
+          if gh release view v1.2.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload v1.2.1 release/*-Linux-x64.tar.gz release/*-Windows-x64.zip release/UBUNTU.md --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit v1.2.1 --title "Why-the-Mouse-Jump-Onto-My-Head-67 v1.2.1" --notes-file release/notes.md --latest --repo "$GITHUB_REPOSITORY"
           else
-            gh release create v1.2.0 release/*-Linux-x64.tar.gz release/*-Windows-x64.zip release/UBUNTU.md --target "$GITHUB_SHA" --title "Why-the-Mouse-Jump-Onto-My-Head-67 v1.2.0" --notes-file release/notes.md --latest --repo "$GITHUB_REPOSITORY"
+            gh release create v1.2.1 release/*-Linux-x64.tar.gz release/*-Windows-x64.zip release/UBUNTU.md --target "$GITHUB_SHA" --title "Why-the-Mouse-Jump-Onto-My-Head-67 v1.2.1" --notes-file release/notes.md --latest --repo "$GITHUB_REPOSITORY"
           fi
