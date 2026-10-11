@@ -4,9 +4,9 @@ A customizable desktop pet for **Ubuntu / Linux Mint and Windows**. Grab a pet, 
 
 **[Ubuntu installation, controls and troubleshooting → UBUNTU.md](UBUNTU.md)**
 
-## Ubuntu download (v1.2.0)
+## Ubuntu download (v1.2.1)
 
-Download the [v1.2.0 Linux x64 archive](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.0/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz) from the [v1.2.0 release](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/tag/v1.2.0). Install the graphics/font packages listed in [UBUNTU.md](UBUNTU.md), extract the whole archive, open the extracted folder in Terminal, and run:
+Download the [v1.2.1 Linux x64 archive](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.1/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz) from the [v1.2.1 release](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/tag/v1.2.1). Install the graphics/font packages listed in [UBUNTU.md](UBUNTU.md), extract the whole archive, open the extracted folder in Terminal, and run:
 
 ```bash
 bash start.sh --doctor
@@ -29,7 +29,11 @@ bash start.sh
 
 For local AI subject detection, run `bash start.sh --setup-ai` once after source setup. Setup installs the optional runtime and foreground model; later launches and image imports work offline. Optionally add the app to Ubuntu's app menu with `bash start.sh --install-desktop`.
 
-On GNOME Wayland the app uses XWayland (`xcb`), and XWayland windows act as collision platforms. The optional read-only GNOME bridge for native Wayland windows is experimental and has **not been verified**; native Wayland interaction is excluded from the v1.2.0 completion claim. See the Ubuntu guide if you want to test it. No tray extension is required; the control room and pet's right-click menu expose the controls.
+On GNOME Wayland the app uses XWayland (`xcb`) for its transparent pet windows. The optional read-only bridge targets **GNOME Shell 45–50** and supplies native Wayland window geometry; it does not support KDE Plasma.
+
+First installation requires logging out and back in so GNOME discovers it, then enabling the extension and checking `bash start.sh --doctor` for **GNOME bridge: connected**. File installation alone does not prove the bridge is running. An already running app reconnects automatically within about five seconds; no app restart is needed. If mixed-monitor coordinates cannot be mapped reliably, detection falls back to X11.
+
+**Live GNOME Wayland verification is still pending.** See [UBUNTU.md](UBUNTU.md) for the steps. No tray extension is required; the control room and pet's right-click menu expose the controls.
 
 ## Import your own character
 
@@ -41,7 +45,7 @@ In the control room, choose **匯入 PNG / JPG**, or drop a PNG/JPG/JPEG into it
 - The preview and all pet copies update together; the imported character survives restart.
 - **還原預設角色** restores the built-in hamster. The original image is never modified.
 
-Imports run in a worker thread, so animation and dragging remain responsive. Input is limited to 32 MB / 24 million pixels. Source installations require one-time AI runtime/model setup; the v1.2.0 binary packages include both. Missing components produce an explicit setup message, without silently preserving the photo's background and claiming success.
+Imports run in a worker thread, so animation and dragging remain responsive. Input is limited to 32 MB / 24 million pixels. Source installations require one-time AI runtime/model setup; the v1.2.1 binary packages include both. Missing components produce an explicit setup message, without silently preserving the photo's background and claiming success.
 
 ## Play
 
@@ -64,14 +68,14 @@ Closing the control room hides it. Use **退出** from the panel or right-click 
 
 ## Downloads and compatibility
 
-[v1.2.0](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/tag/v1.2.0) provides renamed Linux and Windows downloads, with PNG/JPG import, local AI foreground detection, collision fixes and setup tools. The [public repository](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67) can be cloned or downloaded as a source ZIP without signing in.
+[v1.2.1](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/tag/v1.2.1) provides renamed Linux and Windows downloads, with PNG/JPG import, local AI foreground detection, collision fixes and setup tools. The [public repository](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67) can be cloned or downloaded as a source ZIP without signing in.
 
 | Platform | Download | Start |
 | --- | --- | --- |
-| Ubuntu / Linux Mint x64 | [Linux archive](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.0/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz) | Extract the whole folder, then run `bash start.sh` |
-| Windows x64 | [Windows ZIP](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.0/Why-the-Mouse-Jump-Onto-My-Head-67-Windows-x64.zip) | Extract the whole folder, then open `Why-the-Mouse-Jump-Onto-My-Head-67.exe` |
+| Ubuntu / Linux Mint x64 | [Linux archive](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.1/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz) | Extract the whole folder, then run `bash start.sh` |
+| Windows x64 | [Windows ZIP](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.1/Why-the-Mouse-Jump-Onto-My-Head-67-Windows-x64.zip) | Extract the whole folder, then open `Why-the-Mouse-Jump-Onto-My-Head-67.exe` |
 
-Both v1.2.0 packages include Python, Qt and local AI inference; no separate Python installation is needed to launch them. Keep the executable and its `_internal/` directory together. Older Naiwa releases retain their original names and features; use their own installation instructions.
+Both v1.2.1 packages include Python, Qt and local AI inference; no separate Python installation is needed to launch them. Keep the executable and its `_internal/` directory together. Older Naiwa releases retain their original names and features; use their own installation instructions.
 
 The original Linux binary targets Ubuntu 22.04 / 24.04 and Mint 21 / 22, x86_64. Source startup was checked on Ubuntu 26.04 GNOME / XWayland; broad distro, mixed-scaling and Windows checks are still handled by maintainers and CI. Existing Naiwa settings are copied into the renamed app on first launch without replacing newer settings or deleting the old ones.
 

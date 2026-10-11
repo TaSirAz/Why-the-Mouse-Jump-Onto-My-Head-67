@@ -202,27 +202,47 @@ def parse_gnome_snapshot(payload, excluded_pid=None, scale=1, screens=()):
     if not isinstance(data, dict) or data.get("version") != 1 or not isinstance(data.get("windows"), list):
         raise ValueError("Unsupported GNOME geometry protocol.")
     screen_mappings = []
-    logical_by_name = {item[0]: tuple(item[1:]) for item in screens}
     monitors = data.get("monitors", [])
+    strict_mapping = bool(screens) and "monitors" in data
+    mapping_error = "GNOME/Qt monitor mapping is ambiguous or unavailable; using X11 window geometry instead."
+    if strict_mapping and (not isinstance(monitors, list) or not monitors or len(monitors) > 64):
+        raise ValueError(mapping_error)
+    matched_screens = set()
     if isinstance(monitors, list):
         for monitor in monitors[:64]:
             if not isinstance(monitor, dict):
+                if strict_mapping:
+                    raise ValueError(mapping_error)
                 continue
             native = monitor.get("rect")
             if not isinstance(native, list) or len(native) != 4 or any(
-                    not isinstance(v, (int, float)) or not math.isfinite(v) for v in native) or min(native[2:]) <= 0:
+                    isinstance(v, bool) or not isinstance(v, (int, float)) or
+                    not math.isfinite(v) for v in native) or min(native[2:]) <= 0:
+                if strict_mapping:
+                    raise ValueError(mapping_error)
                 continue
             names = monitor.get("names", [])
-            logical = next((logical_by_name[name] for name in names
-                            if isinstance(name, str) and name in logical_by_name), None) if isinstance(names, list) else None
-            if logical is None and len(monitors) == 1 and len(screens) == 1:
-                logical = tuple(screens[0][1:])
-            if logical is None:
-                # An exact geometry match is safe even when XWayland renames connectors.
-                logical = next((geometry for geometry in logical_by_name.values()
-                                if tuple(native) == geometry), None)
-            if logical is not None:
-                screen_mappings.append((tuple(native), logical))
+            names = {name for name in names if isinstance(name, str)} if isinstance(names, list) else set()
+            candidates = [index for index, screen in enumerate(screens) if screen[0] in names]
+            if not candidates and len(monitors) == 1 and len(screens) == 1:
+                candidates = [0]
+            if not candidates:
+                # A unique exact match is safe even when XWayland renames outputs.
+                candidates = [index for index, screen in enumerate(screens)
+                              if tuple(native) == tuple(screen[1:])]
+            if len(candidates) != 1 or candidates[0] in matched_screens:
+                if strict_mapping:
+                    raise ValueError(mapping_error)
+                continue
+            index = candidates[0]
+            logical = tuple(screens[index][1:])
+            if len(logical) != 4 or any(isinstance(v, bool) or not isinstance(v, (int, float))
+                                      or not math.isfinite(v) for v in logical) or min(logical[2:]) <= 0:
+                if strict_mapping:
+                    raise ValueError(mapping_error)
+                continue
+            matched_screens.add(index)
+            screen_mappings.append((tuple(native), logical))
     records, occluders = [], []
     for window in data["windows"][:512]:
         if not isinstance(window, dict):
@@ -261,6 +281,7 @@ class GnomeWindows:
         self.last_error = "GNOME geometry extension not connected."
         self.failed = False
         self.screens = ()
+        self.scale = 1
 
     @property
     def available(self):
@@ -281,7 +302,8 @@ class GnomeWindows:
                                                        GNOME_BRIDGE_NAME, "GetWindows")
                 message.setArguments([os.getpid(), json.dumps([screen[0] for screen in screens])])
                 message.setAutoStartService(False)
-                self.screens = screens
+                self.screens = tuple(screens)
+                self.scale = scale
                 self.pending = QDBusPendingCallWatcher(connection.asyncCall(message, 600))
                 self.pending.finished.connect(self._finished)
             except Exception as exc:
@@ -299,7 +321,7 @@ class GnomeWindows:
             reply = watcher.reply().arguments()
             if len(reply) != 1:
                 raise ValueError("Invalid GNOME geometry response.")
-            self.records = parse_gnome_snapshot(reply[0], os.getpid(), screens=self.screens)
+            self.records = parse_gnome_snapshot(reply[0], os.getpid(), scale=self.scale, screens=self.screens)
             self.last_update = time.monotonic()
             self.failed = False
             self.last_error = ""

@@ -17,7 +17,7 @@ from pet_images import custom_pet_path
 from physics import visible_extents
 from naiwa import Club, migrate_legacy_settings
 from linux_desktop import X11Windows
-from linux_setup import desktop_entry
+from linux_setup import desktop_entry, extension_path, shortcut_path, install_gnome_bridge
 
 ROOT = Path(__file__).resolve().parent
 
@@ -231,6 +231,23 @@ class StartupTests(unittest.TestCase):
             missing = subprocess.run(['bash', str(root / 'start.sh')], env={**os.environ, 'DISPLAY': ''}, text=True, capture_output=True)
             self.assertNotEqual(missing.returncode, 0)
             self.assertIn('XWayland', missing.stderr)
+
+    def test_portable_settings_do_not_redirect_shell_extension_installation(self):
+        with patch.dict(os.environ, {'XDG_DATA_HOME': '/tmp/pet-data',
+                                     'DESKTOP_PETS_DESKTOP_DATA_HOME': '/tmp/desktop-data'}):
+            self.assertEqual(extension_path(), Path('/tmp/desktop-data/gnome-shell/extensions/window-geometry@desktoppets.local'))
+            self.assertEqual(shortcut_path().parent, Path('/tmp/desktop-data/applications'))
+
+    def test_extension_enable_without_bridge_is_not_reported_as_connected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'extensions' / 'window-geometry@desktoppets.local'
+            replies = [subprocess.CompletedProcess([], 0, 'GNOME Shell 50.1', ''),
+                       subprocess.CompletedProcess([], 0, '', '')]
+            with patch('linux_setup.extension_path', return_value=target), \
+                    patch('linux_setup.shutil.which', return_value='/usr/bin/gnome-extensions'), \
+                    patch('linux_setup.subprocess.run', side_effect=replies), \
+                    patch('linux_setup.bridge_diagnostic', return_value=False):
+                self.assertEqual(install_gnome_bridge(), 1)
 
     def test_desktop_entry_escapes_paths(self):
         text = desktop_entry(Path('/tmp/pet space/$literal%name'))

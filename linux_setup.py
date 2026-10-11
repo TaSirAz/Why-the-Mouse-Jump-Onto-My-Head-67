@@ -50,7 +50,8 @@ def desktop_entry(root):
 
 
 def shortcut_path():
-    data = Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local/share')
+    data = Path(os.environ.get('DESKTOP_PETS_DESKTOP_DATA_HOME') or
+                os.environ.get('XDG_DATA_HOME') or Path.home() / '.local/share')
     if not data.is_absolute():
         raise ValueError('XDG_DATA_HOME must be an absolute path.')
     return data / 'applications' / (APP_ID + '.desktop')
@@ -58,7 +59,8 @@ def shortcut_path():
 
 
 def extension_path():
-    data = Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local/share')
+    data = Path(os.environ.get('DESKTOP_PETS_DESKTOP_DATA_HOME') or
+                os.environ.get('XDG_DATA_HOME') or Path.home() / '.local/share')
     if not data.is_absolute():
         raise ValueError('XDG_DATA_HOME must be an absolute path.')
     return data / 'gnome-shell/extensions' / GNOME_BRIDGE_UUID
@@ -99,11 +101,15 @@ def install_gnome_bridge(remove=False):
         result = subprocess.run(['gnome-extensions', 'enable', GNOME_BRIDGE_UUID],
                                 capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
-            print('Enabled. Restart the pet, then check bash start.sh --doctor.')
-            return 0
+            if bridge_diagnostic():
+                print('Enabled and connected. The running pet reconnects automatically within five seconds.')
+                return 0
+            print('GNOME accepted enable, but the bridge has not connected. Check extension errors:')
+            print('gnome-extensions info ' + GNOME_BRIDGE_UUID)
+            return 1
     print('GNOME needs a session reload to discover a new extension: save work, log out and log in.')
     print('Then run: gnome-extensions enable ' + GNOME_BRIDGE_UUID)
-    print('Restart the pet and run bash start.sh --doctor to confirm the bridge is connected.')
+    print('Run bash start.sh --doctor to confirm the bridge is connected; the pet reconnects automatically.')
     return 0
 
 

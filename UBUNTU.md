@@ -1,6 +1,6 @@
 # Ubuntu installation and usage
 
-**Why-the-Mouse-Jump-Onto-My-Head-67 v1.2.0** is available from the [release page](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/tag/v1.2.0). The [Linux x64 archive](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.0/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz) includes Python, Qt and local AI background removal. The public [repository](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67) has the source; its entry point remains `naiwa.py` for compatibility. The default character is a hamster. The interface uses Traditional Chinese, and this guide translates its controls.
+**Why-the-Mouse-Jump-Onto-My-Head-67 v1.2.1** is available from the [release page](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/tag/v1.2.1). The [Linux x64 archive](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.1/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz) includes Python, Qt and local AI background removal. The public [repository](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67) has the source; its entry point remains `naiwa.py` for compatibility. The default character is a hamster. The interface uses Traditional Chinese, and this guide translates its controls.
 
 For the easiest fresh installation, install the system packages in step 1, then follow **2B: Linux package**. Choose **2A: source** if you want to edit or build the application.
 
@@ -9,7 +9,7 @@ For the easiest fresh installation, install the system packages in step 1, then 
 | Option | Use it when | Requirements |
 | --- | --- | --- |
 | Public source | You want to edit the app or build it yourself | Python 3.10+, `python3-venv`, internet for initial setup |
-| v1.2.0 Linux package | Recommended for a normal installation | x86_64 Ubuntu desktop; Python/Qt/AI included |
+| v1.2.1 Linux package | Recommended for a normal installation | x86_64 Ubuntu desktop; Python/Qt/AI included |
 | Older Naiwa release | You downloaded an existing `Naiwa-Linux-x64.tar.gz` | Follow that archive's guide; new commands/features are absent |
 
 Linux packages target Ubuntu 22.04/24.04 and compatible Mint releases. Newer Ubuntu versions may work through XWayland but are not all tested. ARM source installations depend on availability of matching PySide6 wheels; the supplied binary is x86_64.
@@ -51,7 +51,7 @@ The repository is public; cloning or using **Code → Download ZIP** needs no Gi
 
 ## 2B. Install a Linux package
 
-1. Open [v1.2.0](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/tag/v1.2.0). Download [**Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz**](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.0/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz).
+1. Open [v1.2.1](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/tag/v1.2.1). Download [**Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz**](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.1/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz).
 2. Extract it in Files and move the whole folder to a permanent location, such as `~/Applications/`. The extracted directory is **Why-the-Mouse-Jump-Onto-My-Head-67**. Older releases retain the Naiwa name.
 3. Keep the whole extracted directory together, including the executable, `_internal/`, launcher and setup helpers. Do not mix files from different releases.
 4. Open that folder in Terminal and run:
@@ -61,7 +61,7 @@ bash start.sh --doctor
 bash start.sh
 ```
 
-The package includes Python and Qt; `--setup` does not install pip dependencies for it. The diagnostic helper uses Ubuntu's `python3`. If unavailable, install it with `sudo apt install python3`. The v1.2.0 Linux download includes the AI runtime and model, so neither `--setup` nor `--setup-ai` is needed. AI photo imports work offline.
+The package includes Python and Qt; `--setup` does not install pip dependencies for it. The diagnostic helper uses Ubuntu's `python3`. If unavailable, install it with `sudo apt install python3`. The v1.2.1 Linux download includes the AI runtime and model, so neither `--setup` nor `--setup-ai` is needed. AI photo imports work offline.
 
 ## 3. Add an application-menu shortcut
 
@@ -98,40 +98,46 @@ The result is saved as a transparent PNG in application data, while the original
 | Session | Movement and screen collisions | Landing on windows |
 | --- | --- | --- |
 | Xorg / X11 | Supported | Visible X11 windows |
-| GNOME Wayland with XWayland | Supported using Qt `xcb` | XWayland windows; optional native-window bridge is experimental and unverified |
+| GNOME Wayland with XWayland | Supported using Qt `xcb` | XWayland windows; native windows when the optional GNOME bridge is connected |
+| KDE Plasma Wayland with XWayland | Uses Qt `xcb` | XWayland windows only; the GNOME bridge does not support KDE |
 | Wayland without XWayland / `DISPLAY` | Cannot run desktop pets | Unavailable |
 
-Check your session with `echo "$XDG_SESSION_TYPE"`. Wayland does not expose native applications' positions directly to this X11 app. An experimental GNOME Shell geometry bridge is included below, but native Wayland window interaction has not been verified and is excluded from v1.2.0 completion. If your login screen offers **Ubuntu on Xorg**, choosing it enables detection of all X11 windows. Some newer Ubuntu installations do not offer that session. Use XWayland there; installing `xwayland` can require logout and login before `DISPLAY` appears.
+Check your session with `echo "$XDG_SESSION_TYPE"`. Wayland does not expose native applications' positions directly to this X11 app. The optional GNOME Shell geometry bridge below supplies native-window positions after it is enabled and connected. If your login screen offers **Ubuntu on Xorg**, choosing it enables detection of all X11 windows. Some newer Ubuntu installations do not offer that session. Use XWayland there; installing `xwayland` can require logout and login before `DISPLAY` appears.
 
 Pets land on exposed portions of window tops, ride a moving supporting window and fall when it is minimized, closed or leaves the active workspace. Window interaction can use top platforms or solid sides according to the control-room option. The screen boundary uses the full display geometry, so pets can reach the physical display edge rather than stopping at the reserved desktop work area. Partially covered windows retain their exposed landing edges. Drag pets to another display; **全員回家** recovers pets and toys to the screen under the pointer. Screen-name matching with RandR maps collision edges into Qt coordinates on differently scaled displays; older servers fall back to the main display's scale. If a compositor reports inconsistent coordinates, disable **與視窗互動（落地 / 跟隨移動）**; screen collisions remain available.
 
 ## Optional GNOME native-window interaction
 
-The optional companion extension targets GNOME Shell 45–50 and attempts to expose native Wayland window geometry. **Its live native Wayland interaction is not verified.** Installing or enabling it is optional and outside the v1.2.0 completion scope; normal XWayland operation does not require it. The pet itself continues to use XWayland for positionable transparent windows; this is not a switch to a native Wayland renderer.
+The companion extension targets **GNOME Shell 45–50**. It exports read-only native Wayland and XWayland window geometry from GNOME; it does not support KDE Plasma or other compositors. The pet itself still uses XWayland for movable transparent windows. **Live GNOME Wayland verification is still pending.**
 
-From the source or updated package folder:
+From the source or updated package folder, install its files:
 
 ```bash
 bash start.sh --install-gnome-bridge
 ```
 
-This copies the extension into your user's GNOME extension directory and tries to enable it. GNOME may not discover a newly copied extension until you **save your work, log out, and log in**. If the helper asks for that, then run:
+A successful installation message confirms that files were copied, not that GNOME loaded the extension. On a **first installation**, save your work, **log out and log back in** so GNOME discovers the new extension. GNOME Shell 50 has no supported D-Bus method to load a newly copied local extension immediately; `ReloadExtension` is deprecated and does not provide that step.
+
+After logging back in, open a terminal in the application folder and run:
 
 ```bash
 gnome-extensions enable window-geometry@desktoppets.local
 bash start.sh --doctor
-bash start.sh
 ```
 
-The doctor should report **GNOME bridge: connected**. The app reads geometry asynchronously and falls back to X11 if the bridge is unavailable. Only the active workspace's unminimized windows are supplied. The service exports stable session window IDs, process IDs and frame rectangles; it exports no titles or window contents and has no methods to move, resize or control applications. It does not enable GNOME's unsafe `Eval` interface.
+The diagnostic must report **GNOME bridge: connected**. An installed directory or a successful enable command alone is not proof that the geometry service is available. If the app is already running, it reconnects automatically within about five seconds; **do not restart it just to connect the bridge**. If the app is not running after login, launch it normally with `bash start.sh`.
 
-The extension API targets GNOME Shell 45–50; other desktops and older GNOME versions retain X11-only detection. Remove it with:
+The app reads geometry asynchronously. When the bridge is unavailable, or differently scaled monitors cannot be mapped safely to Qt screen coordinates, it falls back to X11/XWayland-only detection and shows the corresponding status. Native-window interaction requires a connected bridge and usable monitor mappings; the app does not guess unmatched coordinates. Only the active workspace's unminimized windows are supplied.
+
+The service exports stable session window IDs, process IDs and frame rectangles. It exports no titles or window contents and has no methods to move, resize or control applications. It does not enable GNOME's unsafe `Eval` interface.
+
+Remove the optional extension with:
 
 ```bash
 bash start.sh --remove-gnome-bridge
 ```
 
-For extension load errors, use `gnome-extensions info window-geometry@desktoppets.local` and `journalctl --user -b -o cat | rg 'WindowGeometry|window-geometry'`. The implementation follows [GNOME extension lifecycle](https://gjs.guide/extensions/overview/anatomy.html), [GJS D-Bus service export](https://gjs.guide/guides/gio/dbus.html), and [Mutter's read-only frame geometry API](https://gnome.pages.gitlab.gnome.org/mutter/meta/method.Window.get_frame_rect.html).
+For load errors, use `gnome-extensions info window-geometry@desktoppets.local` and `journalctl --user -b -o cat | rg 'WindowGeometry|window-geometry'`. Confirm the version with `gnome-shell --version`. The implementation follows [GNOME extension lifecycle](https://gjs.guide/extensions/overview/anatomy.html), [GJS D-Bus service export](https://gjs.guide/guides/gio/dbus.html), and [Mutter's read-only frame geometry API](https://gnome.pages.gitlab.gnome.org/mutter/meta/method.Window.get_frame_rect.html). The first-install limitation is defined in [GNOME Shell 50.1's extension manager](https://github.com/GNOME/gnome-shell/blob/50.1/js/ui/extensionSystem.js) and [D-Bus implementation](https://github.com/GNOME/gnome-shell/blob/50.1/js/ui/shellDBus.js).
 
 ## Controls
 
@@ -206,4 +212,4 @@ xvfb-run -a -s "-screen 0 1280x800x24" env QT_QPA_PLATFORM=xcb .venv/bin/python 
 
 `offscreen` verifies logic only; it is not evidence of a visible desktop window. Startup screenshot verification requires `xcb` and a working graphical display. GNOME may move synthetic test windows, so Xvfb is preferable for deterministic native-window tests.
 
-Run `bash build-linux.sh --with-ai` on an X11/XWayland desktop to install development and inference dependencies, download the model, build once, verify the packaged app and create an AI-enabled Linux archive. `bash build-linux.sh` includes AI when its runtime/model have already been installed, and otherwise produces a smaller package requiring separate source AI setup. The package includes this guide and the setup helper. CI performs packaged verification on Xvfb; that proves X11 integration. Native Wayland interaction remains unverified; enabling the GNOME extension and confirming its bridge status in a real GNOME session are necessary future validation steps.
+Run `bash build-linux.sh --with-ai` on an X11/XWayland desktop to install development and inference dependencies, download the model, build once, verify the packaged app and create an AI-enabled Linux archive. `bash build-linux.sh` includes AI when its runtime/model have already been installed, and otherwise produces a smaller package requiring separate source AI setup. The package includes this guide and the setup helper. CI performs packaged verification on Xvfb; that proves X11 integration. Live GNOME Wayland verification is still pending. It requires a real GNOME session, a connected bridge and usable monitor mappings; Xvfb cannot demonstrate that native interaction.
