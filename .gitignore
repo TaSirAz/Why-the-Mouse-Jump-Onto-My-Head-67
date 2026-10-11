@@ -5,6 +5,7 @@ build/
 dist/
 *.spec
 !packaging/Naiwa.spec
+!packaging/Naiwa-Linux.spec
 verification/
 *.log
 .publish-state.json

@@ -4,6 +4,7 @@
 - Naiwa 外觀、衣服標記、旗幟及校名等不包含在程式碼的 MIT 授權中。
 - PySide6 / Qt：LGPLv3 / GPLv3 / commercial。官方授權：[Qt for Python licensing](https://doc.qt.io/qtforpython-6/licenses.html)。打包保留套件授權檔。可修改來源並用 `build.ps1` 重新打包替換 Qt；另可直接從 Python 原始碼執行。
 - PyInstaller：GPL-2.0-or-later with bootloader exception，允許分發產生的執行檔。[官方授權](https://pyinstaller.org/en/stable/license.html)。
+- Linux 額外使用 [python-xlib](https://github.com/python-xlib/python-xlib) 0.33（LGPL）：以唯讀方式取得 X11 視窗位置。
 
 網路查找參考了以下概念；本專案物理、UI 與互動程式碼自行撰寫，沒有搬用其程式碼或素材：
 

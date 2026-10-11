@@ -1,4 +1,4 @@
-"""Naiwa Roll Club — a native transparent Windows desktop companion."""
+"""Naiwa Roll Club — a transparent Windows / Linux desktop companion."""
 import argparse
 import ctypes
 import json
@@ -9,6 +9,11 @@ import random
 import sys
 import time
 from collections import deque
+from linux_desktop import X11, configure_qt_platform, display_error
+
+configure_qt_platform()
+if __name__ == "__main__" and display_error():
+    raise SystemExit(display_error())
 
 # The distributed executable's startup check must also report import failures,
 # which happen before QApplication or argparse can run.
@@ -40,6 +45,8 @@ ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 MODES = {"wander": "自由翻滾", "follow": "追著滑鼠跑", "party": "暴走派對",
          "sleep": "乖乖睡覺", "focus": "專注陪伴"}
 PALETTE = ["#ffe16b", "#8ef1dd", "#ff9ac2", "#aaa2ff", "#97cfff", "#ffbb86"]
+UI_FONT = "Microsoft JhengHei" if sys.platform == "win32" else "Noto Sans CJK TC"
+DISPLAY_FONT = "Segoe UI" if sys.platform == "win32" else "DejaVu Sans"
 
 
 def clamp(value, low, high):
@@ -48,6 +55,12 @@ def clamp(value, low, high):
 
 def desktop_windows():
     """Read only visible external window top edges; never move external windows."""
+    if sys.platform.startswith("linux"):
+        app = QApplication.instance()
+        if not app or app.platformName() != "xcb":
+            return []
+        scale = app.primaryScreen().devicePixelRatio()
+        return X11.rectangles([int(w.winId()) for w in app.topLevelWidgets()], scale)
     if sys.platform != "win32":
         return []
     from ctypes import wintypes
@@ -175,7 +188,7 @@ class Toy(QWidget):
             c.setAlpha(int(min(1, particle[4] * 3) * 240))
             p.setPen(c)
             if particle[5]:
-                p.setFont(QFont("Segoe UI Symbol", 15))
+                p.setFont(QFont(DISPLAY_FONT, 15))
                 p.drawText(QPoint(round(particle[0]), round(particle[1])), "♥")
             else:
                 p.setPen(Qt.PenStyle.NoPen)
@@ -209,10 +222,10 @@ class Toy(QWidget):
         now = time.monotonic()
         if self.kind == "pet" and self.club.mode in {"sleep", "focus"}:
             p.setPen(QColor("#a9d5ff"))
-            p.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+            p.setFont(QFont(DISPLAY_FONT, 16, QFont.Weight.Bold))
             p.drawText(QPoint(int(b.r * .5), -int(b.r)), "z Z")
         if self.bubble and now < self.bubble_until:
-            p.setFont(QFont("Microsoft JhengHei", 10, QFont.Weight.DemiBold))
+            p.setFont(QFont(UI_FONT, 10, QFont.Weight.DemiBold))
             width = min(self.width() - 10, p.fontMetrics().horizontalAdvance(self.bubble) + 24)
             rect = QRectF(-width / 2, -self.cy + 6, width, 35)
             p.setPen(QPen(self.color, 1.5))
@@ -320,7 +333,7 @@ class Panel(QWidget):
             QSlider::groove:horizontal {background:#304255; height:5px; border-radius:2px;}
             QSlider::handle:horizontal {background:#ffe16b; width:16px; margin:-6px 0; border-radius:8px;}
             QCheckBox {spacing:8px; padding:4px;} QCheckBox::indicator {width:17px; height:17px;}
-        """)
+        """.replace("Microsoft JhengHei", UI_FONT).replace("Segoe UI", DISPLAY_FONT))
         layout = QVBoxLayout(self)
         layout.setContentsMargins(25, 23, 25, 23)
         layout.setSpacing(13)
@@ -373,7 +386,7 @@ class Panel(QWidget):
         start.clicked.connect(lambda: club.start_focus(self.focus_minutes.currentData()))
         focus.addWidget(start)
         layout.addLayout(focus)
-        hint = QLabel("左鍵摸摸 · 拖曳拋擲 · 雙擊旋風 · 滾輪改大小\n右鍵更多功能 · 右下角托盤可以暫停、找回或退出")
+        hint = QLabel("左鍵摸摸 · 拖曳拋擲 · 雙擊旋風 · 滾輪改大小\n右鍵更多功能 · 系統托盤可以暫停、找回或退出")
         hint.setObjectName("sub")
         layout.addWidget(hint)
         bottom = QHBoxLayout()
@@ -384,6 +397,9 @@ class Panel(QWidget):
         hide.clicked.connect(self.hide)
         bottom.addWidget(hide)
         layout.addLayout(bottom)
+        quit_button = QPushButton("退出 Naiwa")
+        quit_button.clicked.connect(lambda: club.app.exit(0))
+        layout.addWidget(quit_button)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
         self.timer.start(500)
@@ -435,7 +451,8 @@ class Club:
         self.tray.setToolTip("Naiwa Roll Club · 左鍵控制室，右鍵更多")
         self.tray.activated.connect(self.tray_activated)
         self.tray.setContextMenu(self.context_menu())
-        self.tray.show()
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self.tray.show()
         self.panel = Panel(self)
         self.add_pet()
         self.timer = QTimer()
@@ -737,7 +754,8 @@ def main():
                 report = {"ok": not STARTUP_ERRORS and not pet.buffer.isNull() and club.panel.isVisible(),
                           "error": "\n".join(STARTUP_ERRORS),
                           "qt": qVersion(), "pet_visible": pet.isVisible(),
-                          "frames_rendered": True, "windows_scan": True}
+                          "frames_rendered": True, "windows_scan": True,
+                          "platform": app.platformName(), "window_rects": club.window_rects}
                 STARTUP_REPORT.parent.mkdir(parents=True, exist_ok=True)
                 STARTUP_REPORT.write_text(json.dumps(report), encoding="utf-8")
                 app.exit(0)
@@ -754,7 +772,7 @@ def main():
     if not lock.tryLock(100):
         return 0  # Existing instance remains available through its tray icon.
     club = Club(app)
-    if args.panel:
+    if args.panel or not QSystemTrayIcon.isSystemTrayAvailable():
         club.show_panel()
     club.say_all("右鍵我，或點托盤開控制室！")
     return app.exec()
