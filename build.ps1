@@ -7,8 +7,9 @@ try {
     }
     & '.venv/Scripts/python.exe' -m pip install -r requirements-dev.txt
     if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
-    & '.venv/Scripts/python.exe' -m PyInstaller --noconfirm --clean --onefile --windowed --name Naiwa --icon assets/naiwa.ico --add-data 'assets;assets' naiwa.py
+    & '.venv/Scripts/python.exe' -m PyInstaller --noconfirm --workpath build/package packaging/Naiwa.spec
     if ($LASTEXITCODE -ne 0) { throw 'Naiwa packaging failed.' }
+    & './verify_build.ps1'
     Compress-Archive -LiteralPath 'dist/Naiwa.exe', 'README.md', 'LICENSE', 'THIRD_PARTY.md' -DestinationPath 'dist/Naiwa-Windows-x64.zip' -Force
     Write-Host 'Ready: dist/Naiwa.exe and dist/Naiwa-Windows-x64.zip'
 } finally {

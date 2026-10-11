@@ -10,6 +10,24 @@ import sys
 import time
 from collections import deque
 
+# The distributed executable's startup check must also report import failures,
+# which happen before QApplication or argparse can run.
+STARTUP_REPORT = None
+STARTUP_ERRORS = []
+if "--verify-startup-report" in sys.argv:
+    report_index = sys.argv.index("--verify-startup-report") + 1
+    if report_index < len(sys.argv):
+        STARTUP_REPORT = Path(sys.argv[report_index]).resolve()
+
+        def report_startup_failure(error_type, error, tb):
+            import traceback
+            STARTUP_ERRORS.append("".join(traceback.format_exception(error_type, error, tb)))
+            STARTUP_REPORT.parent.mkdir(parents=True, exist_ok=True)
+            STARTUP_REPORT.write_text(json.dumps({"ok": False,
+                "error": "\n".join(STARTUP_ERRORS)}), encoding="utf-8")
+
+        sys.excepthook = report_startup_failure
+
 from PySide6.QtCore import QPoint, QRectF, Qt, QTimer, QStandardPaths, QLockFile
 from PySide6.QtGui import (QAction, QBitmap, QColor, QCursor, QFont, QIcon,
                            QImage, QPainter, QPainterPath, QPen, QPixmap, QRegion)
@@ -603,7 +621,7 @@ class Club:
         action("暫停 / 繼續", self.toggle_pause)
         action("找回所有桌寵", self.rescue)
         action("清掉球與點心", lambda: [self.remove(t) for t in self.toys[:] if t.kind != "pet"])
-        action("退出 Naiwa", self.app.quit)
+        action("退出 Naiwa", lambda: self.app.exit(0))
         self.menu = menu  # Keep popup alive beyond mousePressEvent.
         return menu
 
@@ -700,11 +718,35 @@ class Club:
 def main():
     parser = argparse.ArgumentParser(description="Naiwa Roll Club")
     parser.add_argument("--panel", action="store_true", help="show the control room")
+    parser.add_argument("--verify-startup-report", help=argparse.SUPPRESS)
     args = parser.parse_args()
     app = QApplication(sys.argv[:1])
     app.setApplicationName("NaiwaRollClub")
     app.setOrganizationName("Naiwa")
     app.setQuitOnLastWindowClosed(False)
+    if args.verify_startup_report:
+        import tempfile
+        from PySide6.QtCore import qVersion
+        with tempfile.TemporaryDirectory(prefix="naiwa-check-") as temporary_data:
+            club = Club(app, temporary_data)
+            club.show_panel()
+            def finish_check():
+                club.scan_windows()
+                pet = club.toys[0]
+                pet.render_frame(1 / 60)
+                report = {"ok": not STARTUP_ERRORS and not pet.buffer.isNull() and club.panel.isVisible(),
+                          "error": "\n".join(STARTUP_ERRORS),
+                          "qt": qVersion(), "pet_visible": pet.isVisible(),
+                          "frames_rendered": True, "windows_scan": True}
+                STARTUP_REPORT.parent.mkdir(parents=True, exist_ok=True)
+                STARTUP_REPORT.write_text(json.dumps(report), encoding="utf-8")
+                app.exit(0)
+            QTimer.singleShot(1200, finish_check)
+            result = app.exec()
+            report = json.loads(STARTUP_REPORT.read_text(encoding="utf-8"))
+            report["event_loop_exited"] = True
+            STARTUP_REPORT.write_text(json.dumps(report), encoding="utf-8")
+            return result
     data_dir = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation))
     data_dir.mkdir(parents=True, exist_ok=True)
     lock = QLockFile(str(data_dir / "naiwa.lock"))
@@ -719,4 +761,9 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    exit_code = main()
+    if STARTUP_REPORT and STARTUP_REPORT.exists():
+        report = json.loads(STARTUP_REPORT.read_text(encoding="utf-8"))
+        report["main_returned"] = True
+        STARTUP_REPORT.write_text(json.dumps(report), encoding="utf-8")
+    raise SystemExit(exit_code)

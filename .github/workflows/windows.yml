@@ -16,7 +16,9 @@ jobs:
       - name: Verify physics and interactions
         run: python -m unittest test_naiwa -q
       - name: Build portable executable
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Naiwa --icon assets/naiwa.ico --add-data "assets;assets" naiwa.py
+        run: python -m PyInstaller --noconfirm --workpath build/package packaging/Naiwa.spec
+      - name: Verify packaged application startup
+        run: ./verify_build.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: Naiwa-Windows-x64

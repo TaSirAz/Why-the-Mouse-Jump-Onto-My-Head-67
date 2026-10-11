@@ -44,6 +44,8 @@ python -m venv .venv
 
 也可雙擊 `start.cmd`。打包執行 `powershell -ExecutionPolicy Bypass -File build.ps1`，產出 `dist/Naiwa.exe` 與可分發 ZIP。
 
+打包使用 `packaging/Naiwa.spec`，排除其他程式放在 PATH 中的 ICU DLL 與 Windows API-set DLL，讓 Qt 使用 Windows 自帶的 ICU。打包後會執行 `verify_build.ps1`，實際啟動成品並檢查 Qt 載入、桌寵繪製、控制室與視窗偵測成功後才產生 ZIP。GitHub Actions 同樣檢查成品啟動。
+
 必要驗證：`.venv/Scripts/python.exe -m unittest test_naiwa -q`，涵蓋高速碰撞邊界、動量、不同尺寸、拖曳固定物體、負座標螢幕、視窗落地、點擊、點心、數量上限、專注與設定保存。
 
 來源與素材授權見 [THIRD_PARTY.md](THIRD_PARTY.md)。
