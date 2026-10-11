@@ -37,7 +37,7 @@ from PySide6.QtCore import QPoint, QRectF, Qt, QTimer, QStandardPaths, QLockFile
 from PySide6.QtGui import (QAction, QBitmap, QColor, QCursor, QFont, QIcon,
                            QImage, QPainter, QPainterPath, QPen, QPixmap, QRegion)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout,
-    QHBoxLayout, QLabel, QMenu, QPushButton, QSlider, QSystemTrayIcon,
+    QHBoxLayout, QLabel, QMenu, QPushButton, QScrollArea, QSlider, QSystemTrayIcon,
     QVBoxLayout, QWidget)
 from physics import Body, collide, step
 
@@ -334,7 +334,15 @@ class Panel(QWidget):
             QSlider::handle:horizontal {background:#ffe16b; width:16px; margin:-6px 0; border-radius:8px;}
             QCheckBox {spacing:8px; padding:4px;} QCheckBox::indicator {width:17px; height:17px;}
         """.replace("Microsoft JhengHei", UI_FONT).replace("Segoe UI", DISPLAY_FONT))
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        content = QWidget()
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setWidget(content)
+        outer_layout.addWidget(scroll)
+        layout = QVBoxLayout(content)
         layout.setContentsMargins(25, 23, 25, 23)
         layout.setSpacing(13)
         title = QLabel("NAIWA ROLL CLUB")
@@ -404,6 +412,8 @@ class Panel(QWidget):
         self.timer.timeout.connect(self.refresh)
         self.timer.start(500)
         self.refresh()
+        screen = club.app.primaryScreen().availableGeometry()
+        self.resize(460, min(830, max(320, screen.height() - 48)))
 
     def refresh(self):
         c = self.club
@@ -755,8 +765,11 @@ def main():
                           "error": "\n".join(STARTUP_ERRORS),
                           "qt": qVersion(), "pet_visible": pet.isVisible(),
                           "frames_rendered": True, "windows_scan": True,
-                          "platform": app.platformName(), "window_rects": club.window_rects}
+                          "platform": app.platformName(), "window_rects": club.window_rects,
+                          "panel_height": club.panel.height(),
+                          "screen_height": app.primaryScreen().availableGeometry().height()}
                 STARTUP_REPORT.parent.mkdir(parents=True, exist_ok=True)
+                club.panel.grab().save(str(STARTUP_REPORT.with_suffix(".png")))
                 STARTUP_REPORT.write_text(json.dumps(report), encoding="utf-8")
                 app.exit(0)
             QTimer.singleShot(1200, finish_check)

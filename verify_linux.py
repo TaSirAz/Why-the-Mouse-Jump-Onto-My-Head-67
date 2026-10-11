@@ -28,9 +28,12 @@ def main():
                 raise RuntimeError("Linux startup failed: " + json.dumps(report) + process.stderr[-2000:])
             if [120, 260, 670, 440] not in report["window_rects"]:
                 raise RuntimeError("External X11 window detection failed: " + json.dumps(report))
+            if report["panel_height"] > report["screen_height"] - 20:
+                raise RuntimeError("Control room does not fit the Linux screen")
             output = Path("verification")
             output.mkdir(exist_ok=True)
             (output / "linux-startup.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+            (output / "linux-control-room.png").write_bytes(report_path.with_suffix(".png").read_bytes())
             print(f"Linux packaged startup passed: Qt {report['qt']}, xcb, pet rendering, panel, external window detection and clean exit.")
     finally:
         window.destroy()

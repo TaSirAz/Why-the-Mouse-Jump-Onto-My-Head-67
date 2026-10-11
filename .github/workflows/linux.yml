@@ -40,3 +40,4 @@ jobs:
           path: |
             dist/Naiwa-Linux-x64.tar.gz
             verification/linux-startup.json
+            verification/linux-control-room.png
