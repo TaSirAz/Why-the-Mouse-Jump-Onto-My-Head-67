@@ -1,4 +1,4 @@
-param([string]$Executable = 'dist/Why-the-Mouse-Jump-Onto-My-Head-67.exe')
+param([string]$Executable = 'dist/Why-the-Mouse-Jump-Onto-My-Head-67.exe', [string]$AiImage = '')
 $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
 try {
@@ -6,10 +6,12 @@ try {
     $naiwaReportDir = Join-Path $PSScriptRoot 'verification'
     New-Item -ItemType Directory -Path $naiwaReportDir -Force | Out-Null
     $naiwaReport = Join-Path $naiwaReportDir ('startup-' + [guid]::NewGuid().ToString('N') + '.json')
-    $naiwaProcess = Start-Process -FilePath $naiwaExecutable -ArgumentList ('--verify-startup-report "' + $naiwaReport + '"') -WindowStyle Hidden -PassThru
-    if (-not $naiwaProcess.WaitForExit(25000)) {
+    $naiwaArguments = '--verify-startup-report "' + $naiwaReport + '"'
+    if ($AiImage) { $naiwaArguments += ' --verify-ai-image "' + (Resolve-Path -LiteralPath $AiImage).Path + '"' }
+    $naiwaProcess = Start-Process -FilePath $naiwaExecutable -ArgumentList $naiwaArguments -WindowStyle Hidden -PassThru
+    if (-not $naiwaProcess.WaitForExit(30000)) {
         & taskkill.exe /PID $naiwaProcess.Id /T /F *> $null
-        throw 'Packaged application did not finish its startup check within 25 seconds.'
+        throw 'Packaged application did not finish its startup check within 30 seconds.'
     }
     if (-not (Test-Path -LiteralPath $naiwaReport)) {
         throw 'Packaged application failed before writing its startup report.'

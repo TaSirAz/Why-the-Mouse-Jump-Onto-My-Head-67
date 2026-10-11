@@ -9,7 +9,7 @@ import random
 import sys
 import time
 from collections import deque
-from linux_desktop import X11, configure_qt_platform, display_error
+from linux_desktop import X11, DESKTOP, visible_top_segments, configure_qt_platform, display_error
 
 configure_qt_platform()
 if __name__ == "__main__":
@@ -41,9 +41,9 @@ from PySide6.QtGui import (QAction, QBitmap, QColor, QCursor, QFont, QIcon,
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout,
     QHBoxLayout, QLabel, QMenu, QPushButton, QScrollArea, QSlider, QSystemTrayIcon,
     QVBoxLayout, QWidget, QFileDialog)
-from physics import Body, collide, step, substep_count, constrain
+from physics import Body, collide, step, substep_count, constrain, visible_extents, rotated_extents, ImpactGate
 from project_info import APP_NAME, APP_ID, ORGANIZATION, LEGACY_APP_ID, LEGACY_ORGANIZATION
-from pet_images import import_pet_image, load_custom_pet_image, reset_pet_image
+from pet_images import import_pet_image, load_custom_pet_image, reset_pet_image, background_removal_status
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 MODES = {"wander": "自由翻滾", "follow": "追著滑鼠跑", "party": "暴走派對",
@@ -57,16 +57,18 @@ def clamp(value, low, high):
     return max(low, min(value, high))
 
 
-def desktop_windows():
-    """Read only visible external window top edges; never move external windows."""
+def desktop_window_snapshots():
+    """Read visible window geometry; the GNOME bridge also covers Wayland clients."""
+    app = QApplication.instance()
+    if not app:
+        return []
     if sys.platform.startswith("linux"):
-        app = QApplication.instance()
-        if not app or app.platformName() != "xcb":
+        if app.platformName() != "xcb":
             return []
-        scale = app.primaryScreen().devicePixelRatio()
         screens = [(screen.name(), screen.geometry().x(), screen.geometry().y(),
                     screen.geometry().width(), screen.geometry().height()) for screen in app.screens()]
-        return X11.rectangles([int(w.winId()) for w in app.topLevelWidgets()], scale, screens=screens)
+        return DESKTOP.snapshots([int(w.winId()) for w in app.topLevelWidgets()],
+            app.primaryScreen().devicePixelRatio(), screens=screens)
     if sys.platform != "win32":
         return []
     from ctypes import wintypes
@@ -78,6 +80,7 @@ def desktop_windows():
     user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
     callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
     windows = []
+    records = []
 
     @callback_type
     def collect(hwnd, _):
@@ -95,17 +98,57 @@ def desktop_windows():
             if not any(l <= (rect.left + rect.right) / 2 <= r and t <= rect.top < b
                        for l, t, r, b in windows):
                 windows.append((rect.left, rect.top, rect.right, rect.bottom))
+                records.append({"id": "win32:" + str(hwnd), "rect": windows[-1],
+                    "regions": [windows[-1]], "tops": visible_top_segments(windows[-1], windows[:-1]), "source": "win32"})
         return True
 
     user32.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
     user32.EnumWindows(collect, 0)
-    return windows
+    return records
+
+
+def desktop_windows():
+    return [top for record in desktop_window_snapshots() for top in record["tops"]]
+
+
+def alpha_outline(image, threshold=16):
+    """Convex hull of visible pixel edges, centered in source-image coordinates."""
+    image = image.convertToFormat(QImage.Format.Format_RGBA8888)
+    pixels = bytes(image.constBits())
+    width, height = image.width(), image.height()
+    points = []
+    for y in range(height):
+        row = pixels[y * width * 4:(y + 1) * width * 4]
+        visible = [x for x in range(width) if row[x * 4 + 3] >= threshold]
+        if visible:
+            left, right = visible[0], visible[-1] + 1
+            points.extend([(left, y), (right, y), (left, y + 1), (right, y + 1)])
+    points = sorted(set(points))
+    if len(points) <= 2:
+        return [(x - width / 2, y - height / 2) for x, y in points]
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    lower, upper = [], []
+    for point in points:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], point) <= 0:
+            lower.pop()
+        lower.append(point)
+    for point in reversed(points):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], point) <= 0:
+            upper.pop()
+        upper.append(point)
+    return [(x - width / 2, y - height / 2) for x, y in lower[:-1] + upper[:-1]]
 
 
 class Toy(QWidget):
     def __init__(self, club, x, y, kind="pet"):
-        super().__init__(None, Qt.WindowType.FramelessWindowHint |
-                         Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+        flags = (Qt.WindowType.FramelessWindowHint |
+                 Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+        if sys.platform.startswith("linux"):
+            # GNOME otherwise constrains the whole transparent widget to the
+            # work area, leaving its visible character far from screen edges.
+            flags |= Qt.WindowType.X11BypassWindowManagerHint
+        super().__init__(None, flags)
         self.club, self.kind = club, kind
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
@@ -125,16 +168,53 @@ class Toy(QWidget):
         self.hunger, self.energy = 70.0, 90.0
         self.combo = 0
         self.last_hit = 0
+        self.impact_gate = ImpactGate()
         self.buffer = QImage()
         self.refresh_size()
         self.show()
         if kind == "pet":
             self.say(random.choice(["Naiwa 報到！", "今天也要滾起來！", "把我抓起來丟！"]), 3)
 
+    def update_collision_shape(self):
+        if self.kind == "pet":
+            scale = self.body.r * 2 / max(self.club.sprite.width(), self.club.sprite.height())
+            self.body.extents = rotated_extents(self.club.sprite_outline, self.body.angle, scale, self.squash)
+        else:
+            self.body.extents = None
+
+    def align_render_contacts(self, force=False):
+        # Rotation and squash happen after impulses. Keep the newly rendered
+        # silhouette on the contact plane instead of leaving a visual gap.
+        body = self.body
+        if body.held or (not force and not body.grounded):
+            return
+        left, top, right, bottom = self.club.bounds(body)
+        el, et, er, eb = visible_extents(body)
+        for contact in body.surface_contacts:
+            if len(contact) == 2 and contact[0] in {"x", "y"}:
+                axis, side = contact
+                if axis == "x" and force:
+                    body.x = left + el if side == "low" else right - er
+                elif axis == "y":
+                    body.y = top + et if side == "low" else bottom - eb
+            elif contact[0] == "platform":
+                plane = contact[1]
+                if force or body.y + eb >= plane - .1:
+                    body.y = plane - eb
+            elif contact[0] == "window" and force:
+                _, axis, side, rect = contact
+                if side == "left":
+                    body.x = rect[0] - er
+                elif side == "right":
+                    body.x = rect[2] + el
+                elif side == "bottom":
+                    body.y = rect[3] + et
+
     def refresh_size(self):
         diameter = int(self.body.r * 2 + 140)
         self.resize(diameter, diameter + 55)
         self.cx, self.cy = diameter / 2, diameter / 2 + 40
+        self.update_collision_shape()
 
     def say(self, text, seconds=2.3):
         self.bubble, self.bubble_until = text, time.monotonic() + seconds
@@ -148,10 +228,10 @@ class Toy(QWidget):
         self.particles = self.particles[-65:]
         self.squash = min(.24, force / 3500)
 
-    def impact(self, speed):
-        if speed < 120 or self.kind != "pet":
-            return
+    def impact(self, speed, contact=None):
         now = time.monotonic()
+        if self.kind != "pet" or not self.impact_gate.accept(speed, now, contact):
+            return
         self.combo = self.combo + 1 if now - self.last_hit < 2.5 else 1
         self.last_hit = now
         self.club.stats["bounces"] += 1
@@ -256,6 +336,8 @@ class Toy(QWidget):
         if event.button() != Qt.MouseButton.LeftButton:
             return
         self.body.held = True
+        self.body.support = None
+        self.body.grounded = False
         self.body.vx = self.body.vy = 0
         self.press_at = event.globalPosition().toPoint()
         self.drag_offset = self.press_at - QPoint(round(self.body.x), round(self.body.y))
@@ -365,7 +447,7 @@ class Panel(QWidget):
         self.notice.setStyleSheet("color:#ffe16b;")
         layout.addWidget(self.notice)
         if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY"):
-            session_hint = QLabel("Wayland：桌寵功能可用；僅能在 XWayland 視窗頂端落地。")
+            session_hint = QLabel("Wayland：啟用 GNOME 視窗橋接後可與原生視窗互動；連線狀態顯示於控制室。")
             session_hint.setWordWrap(True)
             session_hint.setObjectName("sub")
             layout.addWidget(session_hint)
@@ -383,17 +465,23 @@ class Panel(QWidget):
         self.image_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_preview.setStyleSheet("background:#24374b; border-radius:10px; padding:8px;")
         layout.addWidget(self.image_preview)
-        self.auto_background = QCheckBox("匯入時自動去背（純色背景）")
+        self.auto_background = QCheckBox("匯入時智慧辨識主體去背（本機 AI）")
         self.auto_background.setChecked(True)
         layout.addWidget(self.auto_background)
         tolerance_row = QHBoxLayout()
-        self.tolerance_label = QLabel("去背容差：36")
+        self.background_mode = QComboBox()
+        self.background_mode.addItem("智慧主體去背（照片 / 複雜背景）", "semantic")
+        self.background_mode.addItem("純色背景快速去背", "flat")
+        layout.addWidget(self.background_mode)
+        self.tolerance_label = QLabel("純色容差：36")
         tolerance_row.addWidget(self.tolerance_label)
         self.background_tolerance = QSlider(Qt.Orientation.Horizontal)
         self.background_tolerance.setRange(0, 100)
         self.background_tolerance.setValue(36)
-        self.background_tolerance.valueChanged.connect(lambda value: self.tolerance_label.setText(f"去背容差：{value}"))
+        self.background_tolerance.valueChanged.connect(lambda value: self.tolerance_label.setText(f"純色容差：{value}"))
         self.background_tolerance.setToolTip("提高容差可移除更多近似背景色；再次匯入原圖以重試。")
+        self.background_tolerance.setEnabled(False)
+        self.background_mode.currentIndexChanged.connect(lambda: self.background_tolerance.setEnabled(self.background_mode.currentData() == "flat"))
         tolerance_row.addWidget(self.background_tolerance)
         layout.addLayout(tolerance_row)
         image_actions = QHBoxLayout()
@@ -404,7 +492,8 @@ class Panel(QWidget):
         image_actions.addWidget(self.import_button)
         image_actions.addWidget(self.reset_image_button)
         layout.addLayout(image_actions)
-        self.image_status = QLabel("也可以將一張 PNG / JPG 拖入控制室。原始檔案不會被改動。")
+        ai_ready, ai_message = background_removal_status(club.data_dir)
+        self.image_status = QLabel(("本機 AI 主體去背已就緒。" if ai_ready else ai_message) + "\n也可以將一張 PNG / JPG 拖入控制室，原始檔案不會被改動。")
         self.image_status.setWordWrap(True)
         self.image_status.setObjectName("sub")
         layout.addWidget(self.image_status)
@@ -427,7 +516,8 @@ class Panel(QWidget):
         self.slider.setValue(int(club.settings["size"]))
         self.slider.valueChanged.connect(club.set_size)
         layout.addWidget(self.slider)
-        for key, label in [("windows", "在其他視窗頂端落地 / 翻滾"),
+        for key, label in [("windows", "與視窗互動（落地 / 跟隨移動）"),
+                           ("window_sides", "撞到視窗側邊與底部會反彈"),
                            ("trails", "高速殘影與碰撞粒子"), ("low_gravity", "月球重力")]:
             check = QCheckBox(label)
             check.setChecked(club.settings[key])
@@ -510,15 +600,16 @@ class ImageImportWorker(QObject):
     failed = Signal(str)
     finished = Signal()
 
-    def __init__(self, source, data_dir, remove_background, tolerance):
+    def __init__(self, source, data_dir, remove_background, tolerance, background_mode="semantic"):
         super().__init__()
         self.source, self.data_dir = source, data_dir
         self.remove_background, self.tolerance = remove_background, tolerance
+        self.background_mode = background_mode
 
     def run(self):
         try:
             self.completed.emit(import_pet_image(self.source, self.data_dir,
-                remove_background=self.remove_background, tolerance=self.tolerance))
+                remove_background=self.remove_background, tolerance=self.tolerance, background_mode=self.background_mode))
         except Exception as error:
             self.failed.emit(str(error))
         finally:
@@ -531,7 +622,7 @@ class Club(QObject):
         self.app = app
         self.data_dir = Path(data_dir or QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation))
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.settings = {"size": 64, "windows": True, "trails": True, "low_gravity": False}
+        self.settings = {"size": 64, "windows": True, "trails": True, "low_gravity": False, "window_sides": True}
         self.stats = dict.fromkeys(["bounces", "throws", "best_combo", "pets", "snacks", "focus_sessions"], 0)
         self.load()
         self.mode, self.paused = "wander", False
@@ -547,10 +638,15 @@ class Club(QObject):
         self.sprite = (QPixmap.fromImage(custom_image).scaled(320, 320,
             Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             if custom_image is not None else self.default_sprite)
+        self.sprite_outline = alpha_outline(self.sprite.toImage())
         self.import_thread = self.import_worker = None
+        self.last_import_result = None
+        self.last_import_error = ""
         self.focus_until = 0
         self.antigravity_until = 0
         self.window_rects = []
+        self.window_records = []
+        self.window_walls = []
         self.last = time.monotonic()
         self.accumulator = 0
         self.menu = None
@@ -569,7 +665,7 @@ class Club(QObject):
         self.timer.start(16)
         self.window_timer = QTimer()
         self.window_timer.timeout.connect(self.scan_windows)
-        self.window_timer.start(350)
+        self.window_timer.start(50)
         self.save_timer = QTimer()
         self.save_timer.timeout.connect(self.save)
         self.save_timer.start(30000)
@@ -590,12 +686,14 @@ class Club(QObject):
         if self.import_thread is not None:
             self.panel.image_status.setText("正在處理圖片，請稍候。")
             return
+        self.last_import_result = None
+        self.last_import_error = ""
         self.panel.import_button.setEnabled(False)
         self.panel.reset_image_button.setEnabled(False)
         self.panel.image_status.setText("正在匯入並處理圖片…桌寵仍可操作。")
         thread = QThread(self.app)
         worker = ImageImportWorker(source, self.data_dir, self.panel.auto_background.isChecked(),
-                                   self.panel.background_tolerance.value())
+                                   self.panel.background_tolerance.value(), self.panel.background_mode.currentData())
         self.import_thread, self.import_worker = thread, worker
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
@@ -609,6 +707,7 @@ class Club(QObject):
 
     @Slot(str)
     def image_failed(self, message):
+        self.last_import_error = message
         self.panel.image_status.setText("匯入失敗：" + message)
 
     @Slot()
@@ -624,6 +723,7 @@ class Club(QObject):
         if image.isNull():
             self.panel.image_status.setText("匯入後的圖片無法載入，原角色仍保留。")
             return
+        self.last_import_result = result
         self.sprite = image.scaled(320, 320, Qt.AspectRatioMode.KeepAspectRatio,
                                    Qt.TransformationMode.SmoothTransformation)
         self.update_image_icons()
@@ -631,11 +731,14 @@ class Club(QObject):
         self.say_all("新造型，出發！")
 
     def update_image_icons(self):
+        self.sprite_outline = alpha_outline(self.sprite.toImage())
         icon = QIcon(self.sprite)
         self.tray.setIcon(icon)
         self.panel.setWindowIcon(icon)
         self.panel.refresh_image_preview()
         for toy in self.toys:
+            toy.update_collision_shape()
+            constrain(toy.body, self.bounds(toy.body))
             toy.render_frame(0)
 
     def reset_image(self):
@@ -662,7 +765,7 @@ class Club(QObject):
             raw = data.get("settings", {})
             if type(raw.get("size")) in (int, float) and math.isfinite(raw["size"]):
                 self.settings["size"] = clamp(raw["size"], 38, 100)
-            for key in ["windows", "trails", "low_gravity"]:
+            for key in ["windows", "trails", "low_gravity", "window_sides"]:
                 if isinstance(raw.get(key), bool):
                     self.settings[key] = raw[key]
             for key in self.stats:
@@ -686,7 +789,7 @@ class Club(QObject):
         if screen is None:
             screens = self.app.screens()
             screen = min(screens, key=lambda s: (s.availableGeometry().center() - point).manhattanLength())
-        rect = screen.availableGeometry()
+        rect = screen.geometry()
         return rect.left(), rect.top(), rect.right() + 1, rect.bottom() + 1
 
     def spawn_point(self):
@@ -844,9 +947,53 @@ class Club(QObject):
         return menu
 
     def scan_windows(self):
-        self.window_rects = desktop_windows() if self.settings["windows"] and not self.paused else []
-        self.desktop_notice = ("其他視窗偵測暫時中斷，正在重試；桌寵仍可操作。"
-            if sys.platform.startswith("linux") and self.settings["windows"] and not self.paused and X11.failed else "")
+        if not self.settings["windows"] or self.paused:
+            self.window_rects, self.window_walls, self.window_records = [], [], []
+            return
+        old_records = {record["id"]: record for record in self.window_records}
+        records = desktop_window_snapshots()
+        new_records = {record["id"]: record for record in records}
+        for toy in self.toys:
+            body = toy.body
+            if body.held or body.support is None:
+                continue
+            foot = body.y + visible_extents(body)[3]
+            for identity, previous in old_records.items():
+                if not any(left <= body.x <= right and abs(foot - top) < 3
+                           for left, top, right, bottom in previous["tops"]):
+                    continue
+                current = new_records.get(identity)
+                if current is None:
+                    body.support = None
+                    body.grounded = False
+                    break
+                dx = current["rect"][0] - previous["rect"][0]
+                dy = current["rect"][1] - previous["rect"][1]
+                new_x = body.x + dx
+                support = next(((left, top, right) for left, top, right, bottom in current["tops"]
+                                if left <= new_x <= right), None)
+                if support is not None:
+                    body.x = new_x
+                    body.y = support[1] - visible_extents(body)[3]
+                    body.support = support
+                    constrain(body, self.bounds(body))
+                else:
+                    body.support = None
+                    body.grounded = False
+                break
+        self.window_records = records
+        self.window_rects = [top for record in records for top in record["tops"]]
+        self.window_walls = [region for record in records for region in record.get("regions", [record["rect"]])]
+        if sys.platform.startswith("linux"):
+            if DESKTOP.source == "gnome":
+                self.desktop_notice = "已連接 GNOME：可與原生 Wayland / XWayland 視窗互動。"
+            elif X11.failed:
+                self.desktop_notice = "視窗偵測暫時中斷，正在重試；桌寵仍可操作。"
+            elif os.environ.get("WAYLAND_DISPLAY"):
+                self.desktop_notice = "目前僅偵測 XWayland 視窗。原生 Wayland 互動需安裝 GNOME 視窗橋接。"
+            else:
+                self.desktop_notice = ""
+
 
     def tick(self):
         now = time.monotonic()
@@ -886,9 +1033,10 @@ class Club(QObject):
         gravity = -450 if now < self.antigravity_until else (270 if self.settings["low_gravity"] else 1250)
         cursor = QCursor.pos()
         foods = [t for t in self.toys if t.kind == "food"]
-        supports = {}
         for t in self.toys[:]:
             b = t.body
+            t.update_collision_shape()
+            constrain(b, self.bounds(b))
             drive = 0
             if t.kind == "pet" and not b.held:
                 t.hunger = max(0, t.hunger - dt * .025)
@@ -910,14 +1058,12 @@ class Club(QObject):
                     b.angle = (b.angle + ((-b.angle + 180) % 360 - 180) * dt * 6) % 360
                     b.spin *= .9 ** (dt * 120)
             hits = step(b, self.bounds(b), dt, gravity, .83 if t.kind == "ball" else .69, drive,
-                        platforms=self.window_rects if self.settings["windows"] else ())
-            for _, speed, _, _ in hits:
-                t.impact(speed)
-            if b.grounded and not b.held and self.settings["windows"] and gravity > 0:
-                for left, top, right, bottom in self.window_rects:
-                    if left <= b.x <= right and abs(b.y + b.r - top) < .1:
-                        supports[t] = (left, top, right)
-                        break
+                        platforms=self.window_rects if self.settings["windows"] else (),
+                        window_walls=self.window_walls if self.settings["windows"] and self.settings["window_sides"] else ())
+            for axis, speed, hit_x, hit_y in hits:
+                t.impact(speed, "surface:" + axis)
+            t.update_collision_shape()
+            t.align_render_contacts(force=True)
         toys = self.toys[:]
         consumed = set()
         for i, a in enumerate(toys):
@@ -944,18 +1090,12 @@ class Club(QObject):
                         continue
                     speed = collide(a.body, b.body)
                     if iteration == 0 and speed > 120:
-                        a.impact(speed)
-                        b.impact(speed)
+                        a.impact(speed, ("toy", id(b)))
+                        b.impact(speed, ("toy", id(a)))
             for toy in toys:
+                toy.update_collision_shape()
+                toy.align_render_contacts()
                 constrain(toy.body, self.bounds(toy.body))
-                support = supports.get(toy)
-                if support is not None:
-                    left, top, right = support
-                    body = toy.body
-                    if left <= body.x <= right and body.y + body.r > top:
-                        body.y = top - body.r
-                        body.vy = min(0, body.vy)
-                        body.grounded = body.vy == 0
 
 
 def migrate_legacy_settings(data_dir, legacy_data_dir):
@@ -979,6 +1119,7 @@ def main():
     parser = argparse.ArgumentParser(description=APP_NAME)
     parser.add_argument("--panel", action="store_true", help="show the control room")
     parser.add_argument("--verify-startup-report", help=argparse.SUPPRESS)
+    parser.add_argument("--verify-ai-image", help=argparse.SUPPRESS)
     args = parser.parse_args()
     app = QApplication(sys.argv[:1])
     app.setApplicationName(LEGACY_APP_ID)
@@ -994,7 +1135,13 @@ def main():
         with tempfile.TemporaryDirectory(prefix="naiwa-check-") as temporary_data:
             club = Club(app, temporary_data)
             club.show_panel()
+            ai_deadline = time.monotonic() + 20
+            if args.verify_ai_image:
+                club.import_image(args.verify_ai_image)
             def finish_check():
+                if args.verify_ai_image and club.import_thread is not None and time.monotonic() < ai_deadline:
+                    QTimer.singleShot(100, finish_check)
+                    return
                 club.scan_windows()
                 pet = club.toys[0]
                 pet.render_frame(1 / 60)
@@ -1005,6 +1152,15 @@ def main():
                           "platform": app.platformName(), "window_rects": club.window_rects,
                           "panel_height": club.panel.height(),
                           "screen_height": app.primaryScreen().availableGeometry().height()}
+                if args.verify_ai_image:
+                    subject = club.sprite.toImage().convertToFormat(QImage.Format.Format_RGBA8888)
+                    pixels = bytes(subject.constBits())
+                    alphas = pixels[3::4]
+                    ai_ok = (club.last_import_result is not None and club.last_import_result.background_removed
+                             and any(alpha < 16 for alpha in alphas) and any(alpha > 240 for alpha in alphas))
+                    report.update({"ai_subject_detection": ai_ok,
+                        "ai_error": club.last_import_error or ("Image worker did not finish" if club.import_thread else "")})
+                    report["ok"] = report["ok"] and ai_ok
                 STARTUP_REPORT.parent.mkdir(parents=True, exist_ok=True)
                 club.panel.grab().save(str(STARTUP_REPORT.with_suffix(".png")))
                 STARTUP_REPORT.write_text(json.dumps(report), encoding="utf-8")

@@ -19,13 +19,18 @@ case "${1:-}" in
 Desktop pet (Ubuntu / Linux Mint)
   bash start.sh                   Launch offline after setup
   bash start.sh --setup           Install/update source Python dependencies
+  bash start.sh --setup-ai        Enable real AI photo background removal
+  bash start.sh --install-gnome-bridge  Optional native Wayland window geometry
+  bash start.sh --remove-gnome-bridge   Remove optional GNOME bridge
   bash start.sh --doctor          Check actual X11 connection, Qt libraries and Python
   bash start.sh --install-desktop Add this pet to your app menu
   bash start.sh --remove-desktop  Remove the app-menu shortcut (keep settings)
 See UBUNTU.md for installation, image import, controls and troubleshooting.
 HELP
         exit 0 ;;
-    --doctor|--install-desktop|--remove-desktop)
+    --setup-ai)
+        exec bash enable-background-removal.sh ;;
+    --doctor|--install-desktop|--remove-desktop|--install-gnome-bridge|--remove-gnome-bridge)
         command -v python3 >/dev/null || { echo 'Install python3 first: sudo apt install python3' >&2; exit 1; }
         exec python3 linux_setup.py "$1" ;;
 esac

@@ -55,7 +55,7 @@ bash start.sh
 
 If GitHub reports “Repository not found”, check that your account can access the repository. You can also use **Code → Download ZIP** in your signed-in browser, extract it, and open the extracted folder in Terminal. That folder must contain `naiwa.py`, `project_info.py`, `start.sh`, `requirements.txt` and `assets/`.
 
-`--setup` creates `.venv` inside the project and installs pinned dependencies. Later launches work offline and do not invoke pip. Run `--setup` again after a source update changes requirements. Move the source folder before creating `.venv`; virtual environments should be recreated after moving to another path or computer. There is no system-wide pip installation and no external AI model download for image background removal.
+`--setup` creates `.venv` inside the project and installs pinned dependencies. Later launches work offline and do not invoke pip. Run `--setup` again after a source update changes requirements. Move the source folder before creating `.venv`; virtual environments should be recreated after moving to another path or computer. There is no system-wide pip installation. Optional AI photo removal has its own one-time setup below.
 
 ## 2B. Install a Linux package
 
@@ -85,27 +85,61 @@ Keep the folder in place. After moving it, rerun the registration command. Launc
 
 The standard shortcut uses standard settings. To retain this chat's portable `data/` settings, continue using `bash launch.sh`.
 
-## PNG / JPG characters and automatic background removal
+## PNG / JPG characters and local AI foreground detection
 
-Open the control room and choose **匯入 PNG / JPG**, or drag a single PNG/JPG/JPEG file onto the control room. The imported character replaces the appearance of all pets; their movement and controls continue to work. A preview appears in the control room.
+Open the control room and choose **匯入 PNG / JPG**, or drag one PNG/JPG/JPEG file onto it. The character replaces the appearance of all pets; movement continues during processing, and a preview shows the result. Existing PNG transparency is preserved.
 
-- **匯入時自動去背（純色背景）** enables automatic removal of a near-uniform background connected to the image border.
-- **去背容差** controls how closely pixels must match that background. Increase it for slight color variations; reimport the original image to apply a different tolerance.
-- Existing transparent PNGs keep their transparency. JPGs are converted into transparent PNGs after removal. Empty margins are cropped.
-- Busy photographic backgrounds may be kept with an explanatory notice. This feature works best with a single subject on a plain background. Disable automatic removal if it removes part of the subject.
-- Use the reset character button to return to the built-in character. Your original image file is never overwritten. Imported copies are stored with application settings and remain available after restart.
+For real photographs, first enable local AI once from the **source** folder:
+
+```bash
+bash start.sh --setup-ai
+```
+
+This installs the optional CPU inference dependencies from `requirements-background.txt` and downloads the small U2NETP ONNX foreground model into `models/u2netp.onnx`. Internet access is required for setup; photo inference then runs offline on this computer. No photo is uploaded. Restart the app after installing dependencies. AI-enabled binary packages include the runtime and model and need no source setup.
+
+The automatic mode uses the AI subject mask for photographic or varied backgrounds. It preserves a soft silhouette and crops empty margins. A separately selected plain-color mode is useful for illustrations; its tolerance controls how closely background colors must match. Keeping the background is also available. If AI dependencies or the model are missing, the app displays setup instructions instead of silently treating a photograph as a plain-color image.
+
+The result is saved as a transparent PNG in application data, while the original source file is never modified. Resetting the character returns to the built-in appearance. AI segmentation can omit small details or include unwanted objects; use a clearer single-subject photo, retain the background, or import a PNG already cut out to get the desired result.
 
 ## X11, Wayland and multiple screens
 
 | Session | Movement and screen collisions | Landing on windows |
 | --- | --- | --- |
 | Xorg / X11 | Supported | Visible X11 windows |
-| GNOME Wayland with XWayland | Supported using Qt `xcb` | XWayland windows only |
+| GNOME Wayland with XWayland | Supported using Qt `xcb` | XWayland windows by default; native Wayland windows with optional bridge |
 | Wayland without XWayland / `DISPLAY` | Cannot run desktop pets | Unavailable |
 
-Check your session with `echo "$XDG_SESSION_TYPE"`. Wayland does not expose native applications' positions to this X11 app. If your login screen offers **Ubuntu on Xorg**, choosing it enables detection of all X11 windows. Some newer Ubuntu installations do not offer that session. Use XWayland there; installing `xwayland` can require logout and login before `DISPLAY` appears.
+Check your session with `echo "$XDG_SESSION_TYPE"`. Wayland does not expose native applications' positions directly to this X11 app. The optional GNOME Shell geometry bridge below supplies read-only positions from the compositor. If your login screen offers **Ubuntu on Xorg**, choosing it enables detection of all X11 windows. Some newer Ubuntu installations do not offer that session. Use XWayland there; installing `xwayland` can require logout and login before `DISPLAY` appears.
 
-Pets land on exposed portions of window tops and fall when their support is moved or removed. Partially covered windows retain their exposed landing edges. Drag pets to another display; **全員回家** recovers pets and toys to the screen under the pointer. Screen-name matching with RandR maps collision edges into Qt coordinates on differently scaled displays; older servers fall back to the main display's scale. If a compositor reports inconsistent coordinates, disable **在其他視窗頂端落地 / 翻滾**; screen collisions remain available.
+Pets land on exposed portions of window tops, ride a moving supporting window and fall when it is minimized, closed or leaves the active workspace. Window interaction can use top platforms or solid sides according to the control-room option. The screen boundary uses the full display geometry, so pets can reach the physical display edge rather than stopping at the reserved desktop work area. Partially covered windows retain their exposed landing edges. Drag pets to another display; **全員回家** recovers pets and toys to the screen under the pointer. Screen-name matching with RandR maps collision edges into Qt coordinates on differently scaled displays; older servers fall back to the main display's scale. If a compositor reports inconsistent coordinates, disable **與視窗互動（落地 / 跟隨移動）**; screen collisions remain available.
+
+## Optional GNOME native-window interaction
+
+On GNOME Shell 45–50, an optional companion extension lets pets interact with native Wayland window geometry as well as XWayland windows. The pet itself continues to use XWayland for positionable transparent windows; this is not a switch to a native Wayland renderer.
+
+From the source or updated package folder:
+
+```bash
+bash start.sh --install-gnome-bridge
+```
+
+This copies the extension into your user's GNOME extension directory and tries to enable it. GNOME may not discover a newly copied extension until you **save your work, log out, and log in**. If the helper asks for that, then run:
+
+```bash
+gnome-extensions enable window-geometry@desktoppets.local
+bash start.sh --doctor
+bash start.sh
+```
+
+The doctor should report **GNOME bridge: connected**. The app reads geometry asynchronously and falls back to X11 if the bridge is unavailable. Only the active workspace's unminimized windows are supplied. The service exports stable session window IDs, process IDs and frame rectangles; it exports no titles or window contents and has no methods to move, resize or control applications. It does not enable GNOME's unsafe `Eval` interface.
+
+The extension API targets GNOME Shell 45–50; other desktops and older GNOME versions retain X11-only detection. Remove it with:
+
+```bash
+bash start.sh --remove-gnome-bridge
+```
+
+For extension load errors, use `gnome-extensions info window-geometry@desktoppets.local` and `journalctl --user -b -o cat | rg 'WindowGeometry|window-geometry'`. The implementation follows [GNOME extension lifecycle](https://gjs.guide/extensions/overview/anatomy.html), [GJS D-Bus service export](https://gjs.guide/guides/gio/dbus.html), and [Mutter's read-only frame geometry API](https://gnome.pages.gitlab.gnome.org/mutter/meta/method.Window.get_frame_rect.html).
 
 ## Controls
 
@@ -133,7 +167,7 @@ Changing modes cancels the focus timer. Completion uses tray notifications when 
 
 ## Troubleshooting
 
-Run `bash start.sh --doctor`. It checks required shared libraries, the actual X11 connection, selected Qt backend and source Python dependencies.
+Run `bash start.sh --doctor`. It checks required shared libraries, the actual X11 connection, selected Qt backend, source Python dependencies, and the optional GNOME geometry bridge.
 
 | Symptom | Fix |
 | --- | --- |
@@ -147,7 +181,7 @@ Run `bash start.sh --doctor`. It checks required shared libraries, the actual X1
 | Menu launcher seems silent | Read the launcher log described above, or run `bash start.sh` in Terminal. |
 | Pet off screen | Open controls and choose **全員回家**. |
 | Pet disappears on a workspace | Return to the workspace where it was launched; GNOME controls workspace behavior. |
-| Import fails / background stays | Use one supported image, plain background, and adjust tolerance. The failure notice leaves the existing character in place. |
+| Import fails / background stays | Check AI setup/model readiness, use a clear subject photo, or choose plain-color removal for an illustration. The failure notice leaves the existing character in place. |
 | Packaged executable permission denied | Run `chmod +x Why-the-Mouse-Jump-Onto-My-Head-67`, then `bash start.sh`. The filesystem must permit executable files. |
 
 ## Settings, updates and removal
@@ -180,4 +214,4 @@ xvfb-run -a -s "-screen 0 1280x800x24" env QT_QPA_PLATFORM=xcb .venv/bin/python 
 
 `offscreen` verifies logic only; it is not evidence of a visible desktop window. Startup screenshot verification requires `xcb` and a working graphical display. GNOME may move synthetic test windows, so Xvfb is preferable for deterministic native-window tests.
 
-Run `bash build-linux.sh` on an X11/XWayland desktop to install development dependencies, build once, verify the packaged app and create the new Linux archive. The package includes this guide and the setup helper. CI performs packaged verification on Xvfb; that proves X11 integration, not native Wayland window support.
+Run `bash build-linux.sh --with-ai` on an X11/XWayland desktop to install development and inference dependencies, download the model, build once, verify the packaged app and create an AI-enabled Linux archive. `bash build-linux.sh` includes AI when its runtime/model have already been installed, and otherwise produces a smaller package requiring separate source AI setup. The package includes this guide and the setup helper. CI performs packaged verification on Xvfb; that proves X11 integration. Native Wayland interaction additionally requires enabling the GNOME extension in a real GNOME session and confirming its bridge status.

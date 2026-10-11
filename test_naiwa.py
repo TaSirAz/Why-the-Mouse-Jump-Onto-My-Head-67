@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
-from physics import Body, collide, step
+from physics import Body, collide, step, visible_extents
 from naiwa import Club
 
 
@@ -117,9 +117,10 @@ class InteractionTests(unittest.TestCase):
     def test_window_landing_and_upward_pass(self):
         self.club.window_rects = [(0, 260, 700, 500)]
         b = self.pet.body
-        b.x, b.y, b.vy = 350, 195, 600
+        foot = visible_extents(b)[3]
+        b.x, b.y, b.vy = 350, 260 - foot - 1, 600
         self.club.simulate(1 / 120, time.monotonic())
-        self.assertEqual(b.y, 260 - b.r)
+        self.assertAlmostEqual(b.y + visible_extents(b)[3], 260, delta=.001)
         self.assertLess(b.vy, 0)
         b.y, b.vy = 210, -600
         self.club.simulate(1 / 120, time.monotonic())

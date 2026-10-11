@@ -6,10 +6,11 @@ import subprocess
 import sys
 import tempfile
 from Xlib import X, Xatom, display
+from project_info import EXECUTABLE_NAME
 
 
 def main():
-    executable = Path(sys.argv[1] if len(sys.argv) > 1 else "dist/Naiwa/Naiwa").resolve()
+    executable = Path(sys.argv[1] if len(sys.argv) > 1 else f"dist/{EXECUTABLE_NAME}/{EXECUTABLE_NAME}").resolve()
     connection = display.Display()
     window = connection.screen().root.create_window(120, 260, 550, 180, 0, X.CopyFromParent)
     window.change_property(connection.intern_atom("_NET_WM_PID"), Xatom.CARDINAL, 32, [os.getpid()])
@@ -18,9 +19,12 @@ def main():
     try:
         with tempfile.TemporaryDirectory(prefix="naiwa-linux-verify-") as directory:
             report_path = Path(directory) / "startup.json"
-            process = subprocess.run([str(executable), "--verify-startup-report", str(report_path)],
+            command = [str(executable), "--verify-startup-report", str(report_path)]
+            if len(sys.argv) > 2:
+                command += ["--verify-ai-image", str(Path(sys.argv[2]).resolve())]
+            process = subprocess.run(command,
                 env={**os.environ, "QT_QPA_PLATFORM": "xcb", "QT_SCALE_FACTOR": "1"},
-                capture_output=True, text=True, timeout=25)
+                capture_output=True, text=True, timeout=30)
             if not report_path.exists():
                 raise RuntimeError("Linux executable failed before Qt startup: " + process.stderr[-3000:])
             report = json.loads(report_path.read_text(encoding="utf-8"))

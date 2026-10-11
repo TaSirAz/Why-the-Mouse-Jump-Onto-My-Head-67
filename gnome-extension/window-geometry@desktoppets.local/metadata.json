@@ -1,0 +1,7 @@
+{
+  "uuid": "window-geometry@desktoppets.local",
+  "name": "Desktop Pets Window Geometry",
+  "description": "Read-only active-workspace window geometry for desktop pets, including native Wayland windows. No window titles or contents are exported.",
+  "shell-version": ["45", "46", "47", "48", "49", "50"],
+  "version": 1
+}

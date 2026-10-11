@@ -14,21 +14,21 @@ bash start.sh --doctor
 bash start.sh
 ```
 
-Setup runs once. Later launches work offline. Optionally add the app to Ubuntu's app menu with `bash start.sh --install-desktop`.
+For local AI subject detection, run `bash start.sh --setup-ai` once after source setup. Setup installs the optional runtime and foreground model; later launches and image imports work offline. Optionally add the app to Ubuntu's app menu with `bash start.sh --install-desktop`.
 
-On GNOME Wayland the app uses XWayland (`xcb`): pet movement and controls work, but only XWayland windows can act as platforms. Native Wayland window positions are unavailable. No tray extension is required; the control room and pet's right-click menu expose the controls.
+On GNOME Wayland the app uses XWayland (`xcb`). An optional read-only GNOME bridge adds native Wayland window interaction; without it, only XWayland windows act as platforms. Install the bridge with `bash start.sh --install-gnome-bridge`, then follow the guide to reload the session and enable it. No tray extension is required; the control room and pet's right-click menu expose the controls.
 
 ## Import your own character
 
-In the control room, choose **匯入 PNG / JPG**, or drop a PNG/JPG/JPEG into it. Leave **匯入時自動去背** enabled for a plain background; use the tolerance slider to adjust how similar a colour must be to the background. Reimport the original to try a different tolerance.
+In the control room, choose **匯入 PNG / JPG**, or drop a PNG/JPG/JPEG into it. Default automatic removal uses **local AI subject segmentation**, including photographs and varied backgrounds. Images are processed on this computer and are never uploaded.
 
-- Plain backgrounds connected to the image edges are removed automatically.
-- Existing PNG transparency and enclosed details are preserved.
-- Complex photo backgrounds are kept with an explanation. Use a transparent PNG for a reliable cutout of a photo.
+- Use **智慧主體去背** for photos / complex backgrounds. Existing transparent pixels remain transparent; AI can further trim the subject.
+- Use **純色背景快速去背** for flat illustrations; adjust its tolerance and reimport the original.
+- Turn removal off to keep an existing cutout unchanged (apart from size limits and empty-margin cropping).
 - The preview and all pet copies update together; the imported character survives restart.
 - **還原預設角色** restores Naiwa. The original image is never modified.
 
-Imports run in a worker thread, so desktop animation and dragging remain available. Input is limited to 32 MB / 24 million pixels; imported pets are cropped and stored as a bounded transparent PNG. No external model download or account is needed.
+Imports run in a worker thread, so animation and dragging remain responsive. Input is limited to 32 MB / 24 million pixels. The AI runtime and small U2NETP model require a one-time setup; missing components produce an explicit setup message, without silently preserving the photo's background and claiming success.
 
 ## Play
 
@@ -45,7 +45,7 @@ Imports run in a worker thread, so desktop animation and dragging remain availab
 | Wander / follow / party / sleep / focus | Five behavior modes |
 | Focus timer | 5 / 15 / 25 / 50 minutes, with a visible completion reminder |
 
-Adaptive collision substeps keep fast small toys from passing through one another. Window tops are one-way platforms: pets fall onto them and can jump upward through them. Slow contacts settle; collision separation respects screen boundaries. Geometry is an approximation, particularly for overlapping windows and differently scaled monitors.
+Contacts are tracked so standing or sustained contact does not generate repeated HIT counts or inject spin. Adaptive collision substeps keep fast small toys from passing through one another. Window tops are one-way platforms: pets fall onto them and can jump upward through them. Slow contacts settle; collision separation respects the rotated visible alpha outline. Ubuntu pet windows bypass GNOME work-area placement, so the visible character can touch the physical screen edges. Pets ride supporting windows while they move and fall when the window closes or minimizes; optional side/underside collisions add rebounds. Geometry is an approximation, particularly for overlapping windows and differently scaled monitors.
 
 Closing the control room hides it. Use **退出** from the panel or right-click menu to quit and save. Pause stops physics, while dragging and the focus countdown remain available. Reopening the updated launcher brings the current control room forward.
 

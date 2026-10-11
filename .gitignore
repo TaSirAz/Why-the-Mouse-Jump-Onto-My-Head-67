@@ -13,3 +13,7 @@ verification/
 
 # Portable settings and imported personal images
 data/
+
+# Generated model cache and test/setup files
+models/*.onnx
+work/

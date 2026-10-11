@@ -1,16 +1,24 @@
 """Windows build: Qt must use Windows ICU, never an unrelated ICU from PATH."""
 from pathlib import Path
+import importlib.util
+from PyInstaller.utils.hooks import collect_submodules, collect_dynamic_libs
 
 root = Path(SPECPATH).parent
 import sys
 sys.path.insert(0, str(root))
 from project_info import EXECUTABLE_NAME
+optional_hidden, optional_binaries = [], []
+if importlib.util.find_spec("onnxruntime") is not None:
+    optional_hidden = collect_submodules("onnxruntime")
+    optional_binaries = collect_dynamic_libs("onnxruntime")
+model_datas = [(str(path), "models") for path in (root / "models").glob("*.onnx")]
+license_datas = [(str(root / "licenses"), "licenses")] if (root / "licenses").is_dir() else []
 a = Analysis(
     [str(root / "naiwa.py")],
     pathex=[str(root)],
-    binaries=[],
-    datas=[(str(root / "assets"), "assets")],
-    hiddenimports=[],
+    binaries=optional_binaries,
+    datas=[(str(root / "assets"), "assets")] + model_datas + license_datas,
+    hiddenimports=optional_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

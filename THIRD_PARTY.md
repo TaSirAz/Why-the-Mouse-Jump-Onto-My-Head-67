@@ -12,3 +12,11 @@
 - [QWidget 官方文件](https://doc.qt.io/qtforpython-6/PySide6/QtWidgets/QWidget.html)：透明、無框、置頂視窗及遮罩。
 - [QScreen 官方文件](https://doc.qt.io/qtforpython-6/PySide6/QtGui/QScreen.html)：螢幕工作區域。
 - [QSystemTrayIcon 官方文件](https://doc.qt.io/qtforpython-6/PySide6/QtWidgets/QSystemTrayIcon.html)：托盤與通知。
+
+## 本機智慧去背
+
+- 主體分割使用 [U2NETP / U-2-Net](https://github.com/xuebinqin/U-2-Net)；模型由 [rembg 發行檔](https://github.com/danielgatis/rembg/releases/tag/v0.0.0)提供。上游 Apache-2.0 授權副本位於 `licenses/U2NET-APACHE-2.0.txt`。
+- 本專案以自寫的 Qt / NumPy 前處理及遮罩套用程式，參考 rembg 的模型正規化方式；未內嵌 rembg 套件。
+- [ONNX Runtime](https://github.com/microsoft/onnxruntime)：MIT，副本位於 `licenses/ONNX-RUNTIME-MIT.txt`。
+- [NumPy](https://numpy.org/)：BSD-3-Clause，副本位於 `licenses/NUMPY-LICENSE.txt`；套件另有其二進位相依授權。
+- 打包與推論驗證使用 Matplotlib 官方 sample data 的 `grace_hopper.jpg`；測試時下載至 `work/`，不作為產品角色或包含於分發素材。

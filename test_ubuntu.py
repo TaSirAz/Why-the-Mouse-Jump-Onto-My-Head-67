@@ -11,9 +11,10 @@ from unittest.mock import patch
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QImage, QColor
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEventLoop, QTimer
 from PySide6.QtTest import QTest
 from pet_images import custom_pet_path
+from physics import visible_extents
 from naiwa import Club, migrate_legacy_settings
 from linux_desktop import X11Windows
 from linux_setup import desktop_entry
@@ -87,6 +88,7 @@ class UbuntuTests(unittest.TestCase):
                 image.setPixelColor(x, y, QColor('red'))
         image.save(str(source))
         self.club.add_pet()
+        self.club.panel.background_mode.setCurrentIndex(1)
         self.club.import_image(str(source))
         self.assertFalse(self.club.panel.import_button.isEnabled())
         deadline = time.monotonic() + 5
@@ -124,13 +126,13 @@ class UbuntuTests(unittest.TestCase):
         self.club.bounds = lambda body: (0, 0, 1000, 600)
         self.club.window_rects = [(100, 300, 900, 500)]
         self.club.mode = 'sleep'
-        lower.body.x, lower.body.y = 350, 300 - lower.body.r
+        lower.body.x, lower.body.y = 350, 300 - visible_extents(lower.body)[3]
         upper.body.x, upper.body.y = 350, 150
         for toy in (lower, upper):
             toy.body.vx = toy.body.vy = 0
         for _ in range(120):
             self.club.simulate(1 / 120, time.monotonic())
-            self.assertLessEqual(lower.body.y + lower.body.r, 300.001)
+            self.assertLessEqual(lower.body.y + visible_extents(lower.body)[3], 300.001)
         self.assertGreaterEqual(lower.body.y - upper.body.y, 125)
 
     def test_integrated_fast_ball_contacts_do_not_tunnel(self):
@@ -148,6 +150,60 @@ class UbuntuTests(unittest.TestCase):
         self.assertLess(a.body.x, b.body.x)
         self.assertLess(a.body.vx, 0)
         self.assertGreater(b.body.vx, 0)
+
+    def test_stationary_support_does_not_increment_hit_count(self):
+        pet = self.club.toys[0]
+        self.club.mode = 'sleep'
+        self.club.window_rects = [(100, 300, 900, 500)]
+        pet.body.x, pet.body.y = 350, 300 - visible_extents(pet.body)[3]
+        pet.body.vx = pet.body.vy = pet.body.spin = 0
+        for _ in range(240):
+            self.club.simulate(1 / 120, time.monotonic())
+        self.assertEqual(self.club.stats['bounces'], 0)
+        self.assertEqual(pet.combo, 0)
+        self.assertAlmostEqual(pet.body.y + visible_extents(pet.body)[3], 300, delta=.001)
+
+    def test_moving_window_carries_pet_and_minimize_releases_it(self):
+        pet = self.club.toys[0]
+        old = {'id': 'window:1', 'rect': (100, 300, 900, 500),
+               'regions': [(100, 300, 900, 500)], 'tops': [(100, 300, 900, 500)]}
+        new = {'id': 'window:1', 'rect': (180, 340, 980, 540),
+               'regions': [(180, 340, 980, 540)], 'tops': [(180, 340, 980, 540)]}
+        pet.body.x = 350
+        pet.body.y = 300 - visible_extents(pet.body)[3]
+        pet.body.support = (100, 300, 900)
+        self.club.window_records = [old]
+        self.club.bounds = lambda body: (0, 0, 1200, 800)
+        with patch('naiwa.desktop_window_snapshots', return_value=[new]):
+            self.club.scan_windows()
+        self.assertEqual(pet.body.x, 430)
+        self.assertAlmostEqual(pet.body.y + visible_extents(pet.body)[3], 340, delta=.001)
+        with patch('naiwa.desktop_window_snapshots', return_value=[]):
+            self.club.scan_windows()
+        self.assertIsNone(pet.body.support)
+        self.assertFalse(pet.body.grounded)
+
+    def test_visible_sprite_reaches_edge_after_rotated_impact(self):
+        pet = self.club.toys[0]
+        self.club.settings['windows'] = False
+        self.club.bounds = lambda body: (0, 0, 1000, 600)
+        pet.next_action = float('inf')
+        pet.body.angle = 37
+        pet.body.spin = 0
+        pet.update_collision_shape()
+        pet.body.x = visible_extents(pet.body)[0] + 1
+        pet.body.y = 300
+        pet.body.vx, pet.body.vy = -600, 0
+        self.club.simulate(1 / 120, time.monotonic())
+        pet.particles.clear()
+        pet.trail.clear()
+        pet.bubble_until = 0
+        pet.render_frame(0)
+        image = pet.buffer
+        visible = [x for y in range(image.height()) for x in range(image.width())
+                   if image.pixelColor(x, y).alpha() >= 16]
+        rendered_left = pet.body.x - pet.cx + min(visible)
+        self.assertAlmostEqual(rendered_left, 0, delta=2)
 
 
 class StartupTests(unittest.TestCase):

@@ -1,4 +1,5 @@
 """Linux/X11 integration. Window enumeration is read-only."""
+import json
 import math
 import os
 import sys
@@ -85,6 +86,9 @@ class X11Windows:
         self.last_error = ""
 
     def rectangles(self, exclude_ids=(), scale=1, screens=()):
+        return [top for window in self.snapshots(exclude_ids, scale, screens) for top in window["tops"]]
+
+    def snapshots(self, exclude_ids=(), scale=1, screens=()):
         if not isinstance(scale, (int, float)) or not math.isfinite(scale) or scale <= 0:
             raise ValueError("Display scale must be finite and positive.")
         if time.monotonic() < self.retry_at or not os.environ.get("DISPLAY"):
@@ -123,7 +127,7 @@ class X11Windows:
             excluded_types = {atom("_NET_WM_WINDOW_TYPE_DESKTOP"), atom("_NET_WM_WINDOW_TYPE_DOCK")}
             hidden_state = atom("_NET_WM_STATE_HIDDEN")
             excluded = set(int(i) for i in exclude_ids)
-            rectangles = []
+            records = []
             occluders = []
             for window in windows:
                 try:
@@ -154,13 +158,19 @@ class X11Windows:
                     rect = (left, top, right, bottom)
                     left, top, right, bottom = rect
                     if right - left > 100 * scale and bottom - top > 80 * scale:
-                        rectangles.extend(visible_top_segments(rect, occluders))
+                        tops = map_top_segments(visible_top_segments(rect, occluders), screen_mappings, scale)
+                        regions = map_top_segments([rect], screen_mappings, scale)
+                        if regions:
+                            bounds = (min(r[0] for r in regions), min(r[1] for r in regions),
+                                      max(r[2] for r in regions), max(r[3] for r in regions))
+                            records.append({"id": f"x11:{window.id}", "rect": bounds,
+                                            "regions": regions, "tops": tops, "source": "x11"})
                     occluders.append(rect)
                 except error.XError:
                     continue  # The user may close a window during enumeration.
             self.failed = False
             self.last_error = ""
-            return map_top_segments(rectangles, screen_mappings, scale)
+            return records
         except Exception as exc:
             # Losing an X connection must not crash the physics timer.
             if self.connection is not None:
@@ -176,3 +186,160 @@ class X11Windows:
 
 
 X11 = X11Windows()
+
+GNOME_BRIDGE_NAME = "org.desktoppets.WindowGeometry"
+GNOME_BRIDGE_PATH = "/org/desktoppets/WindowGeometry"
+GNOME_BRIDGE_UUID = "window-geometry@desktoppets.local"
+
+
+def parse_gnome_snapshot(payload, excluded_pid=None, scale=1, screens=()):
+    """Validate the read-only bridge reply before it enters the physics engine."""
+    if not isinstance(scale, (int, float)) or not math.isfinite(scale) or scale <= 0:
+        raise ValueError("Display scale must be finite and positive.")
+    if not isinstance(payload, str) or len(payload) > 1_000_000:
+        raise ValueError("Invalid GNOME geometry reply.")
+    data = json.loads(payload)
+    if not isinstance(data, dict) or data.get("version") != 1 or not isinstance(data.get("windows"), list):
+        raise ValueError("Unsupported GNOME geometry protocol.")
+    screen_mappings = []
+    logical_by_name = {item[0]: tuple(item[1:]) for item in screens}
+    monitors = data.get("monitors", [])
+    if isinstance(monitors, list):
+        for monitor in monitors[:64]:
+            if not isinstance(monitor, dict):
+                continue
+            native = monitor.get("rect")
+            if not isinstance(native, list) or len(native) != 4 or any(
+                    not isinstance(v, (int, float)) or not math.isfinite(v) for v in native) or min(native[2:]) <= 0:
+                continue
+            names = monitor.get("names", [])
+            logical = next((logical_by_name[name] for name in names
+                            if isinstance(name, str) and name in logical_by_name), None) if isinstance(names, list) else None
+            if logical is None and len(monitors) == 1 and len(screens) == 1:
+                logical = tuple(screens[0][1:])
+            if logical is None:
+                # An exact geometry match is safe even when XWayland renames connectors.
+                logical = next((geometry for geometry in logical_by_name.values()
+                                if tuple(native) == geometry), None)
+            if logical is not None:
+                screen_mappings.append((tuple(native), logical))
+    records, occluders = [], []
+    for window in data["windows"][:512]:
+        if not isinstance(window, dict):
+            continue
+        if excluded_pid is not None and window.get("pid") == excluded_pid:
+            continue
+        rect = window.get("rect")
+        if not isinstance(rect, list) or len(rect) != 4 or any(
+                isinstance(value, bool) or not isinstance(value, (int, float)) or
+                not math.isfinite(value) or abs(value) > 10_000_000 for value in rect):
+            continue
+        left, top, right, bottom = rect
+        if right <= left or bottom <= top:
+            continue
+        rect = tuple(rect)
+        tops = map_top_segments(visible_top_segments(rect, occluders), screen_mappings, scale)
+        regions = map_top_segments([rect], screen_mappings, scale)
+        occluders.append(rect)
+        bounds = (min(r[0] for r in regions), min(r[1] for r in regions),
+                  max(r[2] for r in regions), max(r[3] for r in regions))
+        identity = window.get("id")
+        if not isinstance(identity, str) or not identity or len(identity) > 128:
+            continue
+        records.append({"id": "gnome:" + identity, "rect": bounds, "regions": regions,
+                        "tops": tops, "source": "gnome"})
+    return records
+
+
+class GnomeWindows:
+    """Asynchronous geometry reads; absence of the extension never blocks Qt."""
+    def __init__(self):
+        self.pending = None
+        self.records = []
+        self.last_update = 0
+        self.retry_at = 0
+        self.last_error = "GNOME geometry extension not connected."
+        self.failed = False
+        self.screens = ()
+
+    @property
+    def available(self):
+        return self.last_update > 0 and time.monotonic() - self.last_update < 1.5 and not self.failed
+
+    def snapshots(self, scale=1, screens=()):
+        now = time.monotonic()
+        if self.pending is None and now >= self.retry_at:
+            try:
+                from PySide6.QtCore import QCoreApplication
+                from PySide6.QtDBus import QDBusConnection, QDBusMessage, QDBusPendingCallWatcher
+                if QCoreApplication.instance() is None:
+                    return []
+                connection = QDBusConnection.sessionBus()
+                if not connection.isConnected():
+                    raise RuntimeError("Desktop session D-Bus is unavailable.")
+                message = QDBusMessage.createMethodCall(GNOME_BRIDGE_NAME, GNOME_BRIDGE_PATH,
+                                                       GNOME_BRIDGE_NAME, "GetWindows")
+                message.setArguments([os.getpid(), json.dumps([screen[0] for screen in screens])])
+                message.setAutoStartService(False)
+                self.screens = screens
+                self.pending = QDBusPendingCallWatcher(connection.asyncCall(message, 600))
+                self.pending.finished.connect(self._finished)
+            except Exception as exc:
+                self.failed = True
+                self.last_error = str(exc)
+                self.retry_at = now + 5
+        return self.records if self.available else []
+
+    def _finished(self, *args):
+        watcher = self.pending
+        self.pending = None
+        try:
+            if watcher.isError():
+                raise RuntimeError(watcher.error().message())
+            reply = watcher.reply().arguments()
+            if len(reply) != 1:
+                raise ValueError("Invalid GNOME geometry response.")
+            self.records = parse_gnome_snapshot(reply[0], os.getpid(), screens=self.screens)
+            self.last_update = time.monotonic()
+            self.failed = False
+            self.last_error = ""
+        except Exception as exc:
+            self.records = []
+            self.failed = True
+            self.last_error = str(exc)
+            self.retry_at = time.monotonic() + 5
+        finally:
+            if watcher is not None:
+                watcher.deleteLater()
+
+
+class DesktopWindows:
+    """Prefer the optional GNOME bridge; otherwise keep reliable X11 fallback."""
+    def __init__(self):
+        self.gnome = GnomeWindows()
+        self.source = "x11"
+
+    @property
+    def last_error(self):
+        if self.source == "gnome":
+            return self.gnome.last_error
+        return X11.last_error
+
+    @property
+    def bridge_status(self):
+        return "connected" if self.gnome.available else self.gnome.last_error
+
+    def snapshots(self, exclude_ids=(), scale=1, screens=()):
+        if "GNOME" in os.environ.get("XDG_CURRENT_DESKTOP", "").upper():
+            records = self.gnome.snapshots(scale, screens)
+            if self.gnome.available:
+                self.source = "gnome"
+                return records
+        self.source = "x11"
+        return X11.snapshots(exclude_ids, scale, screens)
+
+    def rectangles(self, exclude_ids=(), scale=1, screens=()):
+        return [top for window in self.snapshots(exclude_ids, scale, screens) for top in window["tops"]]
+
+
+DESKTOP = DesktopWindows()

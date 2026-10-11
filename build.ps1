@@ -5,8 +5,10 @@ try {
         python -m venv .venv
         if ($LASTEXITCODE -ne 0) { throw 'Python 3.10+ is required.' }
     }
-    & '.venv/Scripts/python.exe' -m pip install -r requirements-dev.txt
+    & '.venv/Scripts/python.exe' -m pip install -r requirements-dev.txt -r requirements-background.txt
     if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
+    & '.venv/Scripts/python.exe' pet_images.py --download-model --model-dir models
+    if ($LASTEXITCODE -ne 0) { throw 'Foreground model installation failed.' }
     & '.venv/Scripts/python.exe' -m PyInstaller --noconfirm --workpath build/package packaging/Naiwa.spec
     if ($LASTEXITCODE -ne 0) { throw 'Why-the-Mouse-Jump-Onto-My-Head-67 packaging failed.' }
     & './verify_build.ps1'
