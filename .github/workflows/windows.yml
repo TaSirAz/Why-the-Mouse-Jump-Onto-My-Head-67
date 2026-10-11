@@ -12,18 +12,23 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt -r requirements-background.txt
+      - name: Install offline subject-detection model
+        run: python pet_images.py --download-model --model-dir models
       - name: Verify physics and interactions
-        run: python -m unittest test_naiwa -q
+        run: python -m unittest test_naiwa test_physics test_pet_images -q
+      - name: Download independent photo fixture
+        run: python scripts/download-test-photo.py
       - name: Build portable executable
         run: python -m PyInstaller --noconfirm --workpath build/package packaging/Naiwa.spec
       - name: Verify packaged application startup
-        run: ./verify_build.ps1
+        run: ./verify_build.ps1 -AiImage work/inference-photo.jpg
       - uses: actions/upload-artifact@v4
         with:
-          name: Naiwa-Windows-x64
+          name: Why-the-Mouse-Jump-Onto-My-Head-67-Windows-x64
           path: |
-            dist/Naiwa.exe
+            dist/Why-the-Mouse-Jump-Onto-My-Head-67.exe
             README.md
             LICENSE
             THIRD_PARTY.md
+
