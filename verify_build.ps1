@@ -1,4 +1,4 @@
-param([string]$Executable = 'dist/Naiwa.exe')
+param([string]$Executable = 'dist/Why-the-Mouse-Jump-Onto-My-Head-67.exe')
 $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
 try {
@@ -22,3 +22,4 @@ try {
 } finally {
     Pop-Location
 }
+

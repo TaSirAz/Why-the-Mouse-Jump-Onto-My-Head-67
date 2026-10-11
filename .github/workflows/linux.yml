@@ -24,20 +24,21 @@ jobs:
           printf "%s\n" "$dependencies"
           if [[ "$dependencies" == *"not found"* ]]; then exit 1; fi
       - name: Verify physics, interactions and native X11 window detection
-        run: xvfb-run -a -s "-screen 0 1280x800x24" env QT_QPA_PLATFORM=xcb python -m unittest test_naiwa test_linux_desktop -q
+        run: xvfb-run -a -s "-screen 0 1280x800x24" env QT_QPA_PLATFORM=xcb python -m unittest test_physics test_naiwa test_linux_desktop test_ubuntu test_pet_images -q
       - name: Build Linux executable
         run: python -m PyInstaller --noconfirm --workpath build/linux packaging/Naiwa-Linux.spec
       - name: Verify packaged Linux application on X11
-        run: xvfb-run -a -s "-screen 0 1280x800x24" python verify_linux.py dist/Naiwa/Naiwa
+        run: xvfb-run -a -s "-screen 0 1280x800x24" python verify_linux.py dist/Why-the-Mouse-Jump-Onto-My-Head-67/Why-the-Mouse-Jump-Onto-My-Head-67
       - name: Create Linux download
         run: |
-          cp README.md LICENSE THIRD_PARTY.md start.sh dist/Naiwa/
-          chmod +x dist/Naiwa/Naiwa dist/Naiwa/start.sh
-          tar -C dist -czf dist/Naiwa-Linux-x64.tar.gz Naiwa
+          cp README.md UBUNTU.md LICENSE THIRD_PARTY.md start.sh linux_setup.py project_info.py dist/Why-the-Mouse-Jump-Onto-My-Head-67/
+          chmod +x dist/Why-the-Mouse-Jump-Onto-My-Head-67/Why-the-Mouse-Jump-Onto-My-Head-67 dist/Why-the-Mouse-Jump-Onto-My-Head-67/start.sh
+          tar -C dist -czf dist/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz Why-the-Mouse-Jump-Onto-My-Head-67
       - uses: actions/upload-artifact@v4
         with:
-          name: Naiwa-Linux-x64
+          name: Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64
           path: |
-            dist/Naiwa-Linux-x64.tar.gz
+            dist/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz
             verification/linux-startup.json
             verification/linux-control-room.png
+

@@ -1,7 +1,7 @@
 @echo off
 cd /d "%~dp0"
-if exist "dist\Naiwa.exe" (
-    start "" "dist\Naiwa.exe" --panel
+if exist "dist\Why-the-Mouse-Jump-Onto-My-Head-67.exe" (
+    start "" "dist\Why-the-Mouse-Jump-Onto-My-Head-67.exe" --panel
     exit /b
 )
 if not exist ".venv\Scripts\pythonw.exe" (
@@ -11,3 +11,4 @@ if not exist ".venv\Scripts\pythonw.exe" (
     if errorlevel 1 (pause& exit /b 1)
 )
 start "" ".venv\Scripts\pythonw.exe" "naiwa.py" --panel
+

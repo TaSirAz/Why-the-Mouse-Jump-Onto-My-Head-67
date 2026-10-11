@@ -9,3 +9,7 @@ dist/
 verification/
 *.log
 .publish-state.json
+
+
+# Portable settings and imported personal images
+data/

@@ -2,6 +2,9 @@
 from pathlib import Path
 
 root = Path(SPECPATH).parent
+import sys
+sys.path.insert(0, str(root))
+from project_info import EXECUTABLE_NAME
 a = Analysis(
     [str(root / "naiwa.py")],
     pathex=[str(root)],
@@ -24,7 +27,8 @@ a.binaries = [entry for entry in a.binaries
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, a.binaries, a.datas, [],
-    name="Naiwa", debug=False, bootloader_ignore_signals=False,
+    name=EXECUTABLE_NAME, debug=False, bootloader_ignore_signals=False,
     strip=False, upx=False, console=False, disable_windowed_traceback=False,
     icon=str(root / "assets" / "naiwa.ico"),
 )
+

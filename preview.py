@@ -6,11 +6,12 @@ from PySide6.QtCore import QPoint, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen
 from PySide6.QtWidgets import QApplication
 from naiwa import Club
+from project_info import APP_NAME, APP_ID
 
 
 def main():
     app = QApplication([])
-    app.setApplicationName("NaiwaPreview")
+    app.setApplicationName(APP_ID + "Preview")
     app.setQuitOnLastWindowClosed(False)
     output = Path("verification")
     output.mkdir(exist_ok=True)
@@ -43,7 +44,7 @@ def main():
             p.setRenderHint(QPainter.RenderHint.Antialiasing)
             p.setPen(QColor("#fbe077"))
             p.setFont(QFont("Segoe UI", 28, QFont.Weight.Bold))
-            p.drawText(38, 56, "NAIWA ROLL CLUB")
+            p.drawText(38, 56, APP_NAME)
             p.setPen(QColor("#b8c9d6"))
             p.setFont(QFont("Microsoft JhengHei", 12))
             p.drawText(40, 88, "翻滾  /  拋擲  /  互撞  /  視窗頂端落地")
@@ -68,3 +69,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

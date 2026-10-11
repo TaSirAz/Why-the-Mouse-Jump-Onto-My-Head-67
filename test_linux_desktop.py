@@ -1,7 +1,7 @@
 import os
 import sys
 import unittest
-from linux_desktop import X11Windows, configure_qt_platform, display_error
+from linux_desktop import X11Windows, configure_qt_platform, display_error, visible_top_segments, map_top_segments
 
 
 class PlatformPolicyTests(unittest.TestCase):
@@ -22,6 +22,31 @@ class PlatformPolicyTests(unittest.TestCase):
         self.assertIn("X11", display_error("linux", {}))
         self.assertIn("xcb", display_error("linux", {"QT_QPA_PLATFORM": "wayland", "DISPLAY": ":1"}))
         self.assertEqual(display_error("linux", {"QT_QPA_PLATFORM": "offscreen"}), "")
+
+
+class WindowEdgeTests(unittest.TestCase):
+    def test_partial_occlusion_keeps_both_exposed_edges(self):
+        rect = (0, 100, 800, 600)
+        self.assertEqual(visible_top_segments(rect, [(250, 50, 550, 300)]),
+                         [(0, 100, 250, 600), (550, 100, 800, 600)])
+        self.assertEqual(visible_top_segments(rect, [(0, 50, 900, 300)]), [])
+        self.assertEqual(visible_top_segments(rect, [(0, 200, 900, 300)]), [rect])
+
+    def test_mixed_scale_spanning_window_uses_monitor_origins(self):
+        mappings = [((0, 0, 1920, 1080), (0, 0, 1920, 1080)),
+                    ((1920, 0, 2560, 1440), (1920, 0, 1280, 720))]
+        self.assertEqual(map_top_segments([(1800, 200, 2320, 600)], mappings),
+                         [(1800, 200, 1920, 600), (1920, 100, 2120, 300)])
+        self.assertEqual(map_top_segments([(300, 200, 900, 600)], (), 2),
+                         [(150, 100, 450, 300)])
+
+    def test_invalid_display_scale_is_rejected(self):
+        for scale in (0, -1, float('nan'), float('inf')):
+            with self.assertRaises(ValueError):
+                X11Windows().rectangles(scale=scale)
+
+    def test_screenshot_verification_rejects_headless_backend(self):
+        self.assertIn('visible', display_error('linux', {'QT_QPA_PLATFORM': 'offscreen'}, require_visible=True))
 
 
 @unittest.skipUnless(sys.platform.startswith("linux") and os.environ.get("DISPLAY"), "requires Linux X11")
@@ -58,3 +83,4 @@ class X11WindowTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
