@@ -108,7 +108,7 @@ Pets land on exposed portions of window tops, ride a moving supporting window an
 
 ## Optional GNOME native-window interaction
 
-The companion extension targets **GNOME Shell 45–50**. It exports read-only native Wayland and XWayland window geometry from GNOME; it does not support KDE Plasma or other compositors. The pet itself still uses XWayland for movable transparent windows. **Live GNOME Wayland verification is still pending.**
+The companion extension targets **GNOME Shell 45–50**. It exports read-only native Wayland and XWayland window geometry from GNOME; it does not support KDE Plasma or other compositors. The pet itself still uses XWayland for movable transparent windows. **Native Wayland window landing, side rebound, minimized-window release and zero stationary HITs were verified on GNOME 50.1.**
 
 From the source or updated package folder, install its files:
 
@@ -212,4 +212,4 @@ xvfb-run -a -s "-screen 0 1280x800x24" env QT_QPA_PLATFORM=xcb .venv/bin/python 
 
 `offscreen` verifies logic only; it is not evidence of a visible desktop window. Startup screenshot verification requires `xcb` and a working graphical display. GNOME may move synthetic test windows, so Xvfb is preferable for deterministic native-window tests.
 
-Run `bash build-linux.sh --with-ai` on an X11/XWayland desktop to install development and inference dependencies, download the model, build once, verify the packaged app and create an AI-enabled Linux archive. `bash build-linux.sh` includes AI when its runtime/model have already been installed, and otherwise produces a smaller package requiring separate source AI setup. The package includes this guide and the setup helper. CI performs packaged verification on Xvfb; that proves X11 integration. Live GNOME Wayland verification is still pending. It requires a real GNOME session, a connected bridge and usable monitor mappings; Xvfb cannot demonstrate that native interaction.
+Run `bash build-linux.sh --with-ai` on an X11/XWayland desktop to install development and inference dependencies, download the model, build once, verify the packaged app and create an AI-enabled Linux archive. `bash build-linux.sh` includes AI when its runtime/model have already been installed, and otherwise produces a smaller package requiring separate source AI setup. The package includes this guide and the setup helper. CI performs packaged verification on Xvfb; that proves X11 integration. Native Wayland window landing, side rebound, minimized-window release and zero stationary HITs were verified on GNOME 50.1. It requires a real GNOME session, a connected bridge and usable monitor mappings; Xvfb cannot demonstrate that native interaction.

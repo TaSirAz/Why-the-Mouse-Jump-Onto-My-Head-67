@@ -115,7 +115,13 @@ class GnomeBridgeTests(unittest.TestCase):
             def isError(self): return False
             def reply(self): return Reply()
             def deleteLater(self): pass
+        class PidReply:
+            def isValid(self): return True
+            def value(self): return os.getpid() + 10000
         class Connection:
+            def baseService(self): return ':test.1'
+            def interface(self): return self
+            def servicePid(self, name): return PidReply()
             def isConnected(self): return True
             def asyncCall(self, message, timeout): return object()
         backend = GnomeWindows()
@@ -126,7 +132,7 @@ class GnomeBridgeTests(unittest.TestCase):
         self.assertEqual(backend.scale, 2)
         with patch('linux_desktop.parse_gnome_snapshot', return_value=[]) as parser:
             backend._finished()
-        parser.assert_called_once_with('{"version":1,"windows":[]}', os.getpid(), scale=2, screens=())
+        parser.assert_called_once_with('{"version":1,"windows":[]}', os.getpid() + 10000, scale=2, screens=())
 
     def test_invalid_protocol_and_geometry_never_enter_physics(self):
         for payload in ('[]', '{}', '{"version":2,"windows":[]}'):

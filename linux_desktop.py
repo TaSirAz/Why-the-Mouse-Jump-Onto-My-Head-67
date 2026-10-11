@@ -282,6 +282,8 @@ class GnomeWindows:
         self.failed = False
         self.screens = ()
         self.scale = 1
+        self.excluded_pid = os.getpid()
+        self.bus_name = None
 
     @property
     def available(self):
@@ -298,9 +300,18 @@ class GnomeWindows:
                 connection = QDBusConnection.sessionBus()
                 if not connection.isConnected():
                     raise RuntimeError("Desktop session D-Bus is unavailable.")
+                # The bus daemon sees the compositor's PID namespace, even when
+                # the pet runs inside a container or sandbox.
+                bus_name = connection.baseService()
+                if bus_name != self.bus_name:
+                    pid_reply = connection.interface().servicePid(bus_name)
+                    if not pid_reply.isValid() or pid_reply.value() <= 0:
+                        raise RuntimeError("Cannot resolve desktop-session process identity.")
+                    self.excluded_pid = pid_reply.value()
+                    self.bus_name = bus_name
                 message = QDBusMessage.createMethodCall(GNOME_BRIDGE_NAME, GNOME_BRIDGE_PATH,
                                                        GNOME_BRIDGE_NAME, "GetWindows")
-                message.setArguments([os.getpid(), json.dumps([screen[0] for screen in screens])])
+                message.setArguments([self.excluded_pid, json.dumps([screen[0] for screen in screens])])
                 message.setAutoStartService(False)
                 self.screens = tuple(screens)
                 self.scale = scale
@@ -321,7 +332,7 @@ class GnomeWindows:
             reply = watcher.reply().arguments()
             if len(reply) != 1:
                 raise ValueError("Invalid GNOME geometry response.")
-            self.records = parse_gnome_snapshot(reply[0], os.getpid(), scale=self.scale, screens=self.screens)
+            self.records = parse_gnome_snapshot(reply[0], self.excluded_pid, scale=self.scale, screens=self.screens)
             self.last_update = time.monotonic()
             self.failed = False
             self.last_error = ""

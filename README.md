@@ -33,7 +33,7 @@ On GNOME Wayland the app uses XWayland (`xcb`) for its transparent pet windows. 
 
 First installation requires logging out and back in so GNOME discovers it, then enabling the extension and checking `bash start.sh --doctor` for **GNOME bridge: connected**. File installation alone does not prove the bridge is running. An already running app reconnects automatically within about five seconds; no app restart is needed. If mixed-monitor coordinates cannot be mapped reliably, detection falls back to X11.
 
-**Live GNOME Wayland verification is still pending.** See [UBUNTU.md](UBUNTU.md) for the steps. No tray extension is required; the control room and pet's right-click menu expose the controls.
+**Native Wayland window landing, side rebound, minimized-window release and zero stationary HITs were verified on GNOME 50.1.** See [UBUNTU.md](UBUNTU.md) for the steps. No tray extension is required; the control room and pet's right-click menu expose the controls.
 
 ## Import your own character
 
