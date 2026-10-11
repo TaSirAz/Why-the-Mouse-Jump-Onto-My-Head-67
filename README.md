@@ -18,7 +18,7 @@
 
 ```bash
 sudo apt update
-sudo apt install libegl1 libgl1 libdbus-1-3 libfontconfig1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0 fonts-noto-cjk
+sudo apt install libegl1 libgl1 libdbus-1-3 libfontconfig1 libx11-xcb1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0 libxcb-xinput0 fonts-noto-cjk
 tar -xzf Naiwa-Linux-x64.tar.gz
 cd Naiwa
 bash start.sh
