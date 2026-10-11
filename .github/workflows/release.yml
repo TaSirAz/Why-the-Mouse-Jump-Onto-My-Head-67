@@ -1,0 +1,93 @@
+name: Publish v1.2.0
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/release.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-v1.2.0
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Wait for successful builds of this release commit
+        id: builds
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          for platform in linux windows; do
+            build_id=
+            for attempt in $(seq 1 80); do
+              result=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$platform.yml/runs?branch=main&per_page=10" --jq '.workflow_runs[] | select(.head_sha == env.GITHUB_SHA and .event == "push") | [.id,.status,(.conclusion // "pending")] | @tsv' | head -n 1)
+              if [ -n "$result" ]; then
+                read -r build_id status conclusion <<< "$result"
+                if [ "$status" = completed ]; then
+                  test "$conclusion" = success || { echo "$platform build failed: $conclusion"; exit 1; }
+                  break
+                fi
+              fi
+              sleep 15
+            done
+            test -n "$build_id" && test "$status" = completed && test "$conclusion" = success
+            echo "$platform=$build_id" >> "$GITHUB_OUTPUT"
+          done
+      - uses: actions/download-artifact@v4
+        with:
+          name: Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64
+          run-id: ${{ steps.builds.outputs.linux }}
+          github-token: ${{ github.token }}
+          path: release/linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: Why-the-Mouse-Jump-Onto-My-Head-67-Windows-x64
+          run-id: ${{ steps.builds.outputs.windows }}
+          github-token: ${{ github.token }}
+          path: release/windows
+      - name: Prepare current guides and portable downloads
+        run: |
+          package=Why-the-Mouse-Jump-Onto-My-Head-67
+          mkdir -p release/staging
+          mapfile -t archives < <(find release/linux -type f -name "$package-Linux-x64.tar.gz")
+          test "${#archives[@]}" = 1
+          tar -xzf "${archives[0]}" -C release/staging
+          cp README.md UBUNTU.md "release/staging/$package/"
+          tar -C release/staging -czf "release/$package-Linux-x64.tar.gz" "$package"
+          mapfile -t executables < <(find release/windows -type f -name "$package.exe")
+          test "${#executables[@]}" = 1
+          mkdir -p release/windows-portable
+          cp "${executables[0]}" release/windows-portable/
+          cp README.md LICENSE THIRD_PARTY.md release/windows-portable/
+          cp -R licenses release/windows-portable/
+          (cd release/windows-portable && zip -qr "../$package-Windows-x64.zip" .)
+          cp UBUNTU.md release/UBUNTU.md
+      - name: Publish release with both tested binaries
+        run: |
+          cat > release/notes.md <<'NOTES'
+          Renamed to **Why-the-Mouse-Jump-Onto-My-Head-67**.
+
+          - Ubuntu/Linux and Windows portable downloads include offline AI subject detection for PNG/JPG imports.
+          - The default pet and application icon now use the selected hamster image.
+          - Stable resting collisions, visible sprites reaching all four screen edges, and interaction with moving X11/XWayland windows.
+          - Updated Ubuntu installation, desktop shortcut, troubleshooting and image-import instructions.
+          - Existing Naiwa settings migrate on first launch. The source entry point remains `naiwa.py`.
+
+          **Ubuntu:** extract the Linux archive and run `bash start.sh`; follow the attached `UBUNTU.md` for dependencies and desktop installation.
+          **Windows:** extract the Windows ZIP and run `Why-the-Mouse-Jump-Onto-My-Head-67.exe`.
+
+          Native Wayland window bridging is optional and remains unverified. X11/XWayland window interaction is verified.
+          NOTES
+          if gh release view v1.2.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload v1.2.0 release/*-Linux-x64.tar.gz release/*-Windows-x64.zip release/UBUNTU.md --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit v1.2.0 --title "Why-the-Mouse-Jump-Onto-My-Head-67 v1.2.0" --notes-file release/notes.md --latest --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create v1.2.0 release/*-Linux-x64.tar.gz release/*-Windows-x64.zip release/UBUNTU.md --target "$GITHUB_SHA" --title "Why-the-Mouse-Jump-Onto-My-Head-67 v1.2.0" --notes-file release/notes.md --latest --repo "$GITHUB_REPOSITORY"
+          fi

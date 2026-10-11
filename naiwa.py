@@ -173,7 +173,7 @@ class Toy(QWidget):
         self.refresh_size()
         self.show()
         if kind == "pet":
-            self.say(random.choice(["Naiwa 報到！", "今天也要滾起來！", "把我抓起來丟！"]), 3)
+            self.say(random.choice(["倉鼠報到！", "今天也要滾起來！", "把我抓起來丟！"]), 3)
 
     def update_collision_shape(self):
         if self.kind == "pet":
@@ -394,7 +394,7 @@ class Toy(QWidget):
             self.body.vy = -850
             self.body.spin = random.choice([-1050, 1050])
             self.burst(700)
-            self.say("Naiwa 旋風！")
+            self.say("倉鼠旋風！")
 
     def wheelEvent(self, event):
         if self.kind == "pet":

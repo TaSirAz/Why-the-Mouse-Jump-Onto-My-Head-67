@@ -1,23 +1,15 @@
 # Ubuntu installation and usage
 
-**Why-the-Mouse-Jump-Onto-My-Head-67** is the new application name. The repository URL and the source entry point `naiwa.py` remain usable. The interface uses Traditional Chinese; this guide translates its controls.
+**Why-the-Mouse-Jump-Onto-My-Head-67 v1.2.0** is available from the [release page](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/tag/v1.2.0). The [Linux x64 archive](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.0/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz) includes Python, Qt and local AI background removal. The public [repository](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67) has the source; its entry point remains `naiwa.py` for compatibility. The default character is a hamster. The interface uses Traditional Chinese, and this guide translates its controls.
 
-## Quick start: this computer
-
-Open a terminal in this project folder and run:
-
-```bash
-bash launch.sh
-```
-
-This chat's launcher keeps settings and imported images in the project's `data/` folder. You do not need to install the app again. For a fresh installation on another computer, use the instructions below.
+For the easiest fresh installation, install the system packages in step 1, then follow **2B: Linux package**. Choose **2A: source** if you want to edit or build the application.
 
 ## Choose an installation
 
 | Option | Use it when | Requirements |
 | --- | --- | --- |
-| Updated source | You want the new collision and PNG/JPG import features now | Python 3.10+, `python3-venv`, internet for initial setup |
-| Linux package built from this source | You have the new `.tar.gz` archive | x86_64 Ubuntu desktop; Python/Qt included |
+| Public source | You want to edit the app or build it yourself | Python 3.10+, `python3-venv`, internet for initial setup |
+| v1.2.0 Linux package | Recommended for a normal installation | x86_64 Ubuntu desktop; Python/Qt/AI included |
 | Older Naiwa release | You downloaded an existing `Naiwa-Linux-x64.tar.gz` | Follow that archive's guide; new commands/features are absent |
 
 Linux packages target Ubuntu 22.04/24.04 and compatible Mint releases. Newer Ubuntu versions may work through XWayland but are not all tested. ARM source installations depend on availability of matching PySide6 wheels; the supplied binary is x86_64.
@@ -46,22 +38,22 @@ sudo apt install python3 python3-venv git
 Download and extract the updated source, or clone the repository:
 
 ```bash
-git clone https://github.com/TaSirAz/naiwa-desktop-pet.git
-cd naiwa-desktop-pet
+git clone https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67.git
+cd Why-the-Mouse-Jump-Onto-My-Head-67
 bash start.sh --setup
 bash start.sh --doctor
 bash start.sh
 ```
 
-If GitHub reports “Repository not found”, check that your account can access the repository. You can also use **Code → Download ZIP** in your signed-in browser, extract it, and open the extracted folder in Terminal. That folder must contain `naiwa.py`, `project_info.py`, `start.sh`, `requirements.txt` and `assets/`.
+The repository is public; cloning or using **Code → Download ZIP** needs no GitHub sign-in. If you see “Repository not found”, check the exact new URL above. After downloading a ZIP, extract it and open the extracted folder in Terminal. That folder must contain `naiwa.py`, `project_info.py`, `start.sh`, `requirements.txt` and `assets/`.
 
 `--setup` creates `.venv` inside the project and installs pinned dependencies. Later launches work offline and do not invoke pip. Run `--setup` again after a source update changes requirements. Move the source folder before creating `.venv`; virtual environments should be recreated after moving to another path or computer. There is no system-wide pip installation. Optional AI photo removal has its own one-time setup below.
 
 ## 2B. Install a Linux package
 
-1. Open [Releases](https://github.com/TaSirAz/naiwa-desktop-pet/releases). Download a Linux `.tar.gz` archive built from the updated source when available.
-2. Extract it in Files and move the whole folder to a permanent location, such as `~/Applications/`. New packages are named **Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz**; older releases retain the Naiwa name.
-3. Keep the executable, `_internal/`, `start.sh`, `linux_setup.py` and `project_info.py` together. Do not mix files from different releases.
+1. Open [v1.2.0](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/tag/v1.2.0). Download [**Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz**](https://github.com/TaSirAz/Why-the-Mouse-Jump-Onto-My-Head-67/releases/download/v1.2.0/Why-the-Mouse-Jump-Onto-My-Head-67-Linux-x64.tar.gz).
+2. Extract it in Files and move the whole folder to a permanent location, such as `~/Applications/`. The extracted directory is **Why-the-Mouse-Jump-Onto-My-Head-67**. Older releases retain the Naiwa name.
+3. Keep the whole extracted directory together, including the executable, `_internal/`, launcher and setup helpers. Do not mix files from different releases.
 4. Open that folder in Terminal and run:
 
 ```bash
@@ -69,7 +61,7 @@ bash start.sh --doctor
 bash start.sh
 ```
 
-The package includes Python and Qt; `--setup` does not install pip dependencies for it. The diagnostic helper uses Ubuntu's `python3`. If unavailable, install it with `sudo apt install python3`. A package has not been published merely because this guide describes its name.
+The package includes Python and Qt; `--setup` does not install pip dependencies for it. The diagnostic helper uses Ubuntu's `python3`. If unavailable, install it with `sudo apt install python3`. The v1.2.0 Linux download includes the AI runtime and model, so neither `--setup` nor `--setup-ai` is needed. AI photo imports work offline.
 
 ## 3. Add an application-menu shortcut
 
@@ -83,7 +75,7 @@ Search the application menu for **Why-the-Mouse-Jump-Onto-My-Head-67**. Opening 
 
 Keep the folder in place. After moving it, rerun the registration command. Launcher errors are written to `~/.local/state/WhyTheMouseJumpOntoMyHead67/launcher.log` (or `$XDG_STATE_HOME/WhyTheMouseJumpOntoMyHead67/launcher.log`).
 
-The standard shortcut uses standard settings. To retain this chat's portable `data/` settings, continue using `bash launch.sh`.
+The standard shortcut uses standard settings. If you already use a portable copy containing `launch.sh`, continue launching it with `bash launch.sh` to retain that copy's local `data/` settings.
 
 ## PNG / JPG characters and local AI foreground detection
 
@@ -99,23 +91,23 @@ This installs the optional CPU inference dependencies from `requirements-backgro
 
 The automatic mode uses the AI subject mask for photographic or varied backgrounds. It preserves a soft silhouette and crops empty margins. A separately selected plain-color mode is useful for illustrations; its tolerance controls how closely background colors must match. Keeping the background is also available. If AI dependencies or the model are missing, the app displays setup instructions instead of silently treating a photograph as a plain-color image.
 
-The result is saved as a transparent PNG in application data, while the original source file is never modified. Resetting the character returns to the built-in appearance. AI segmentation can omit small details or include unwanted objects; use a clearer single-subject photo, retain the background, or import a PNG already cut out to get the desired result.
+The result is saved as a transparent PNG in application data, while the original source file is never modified. Resetting the character returns to the built-in hamster. AI segmentation can omit small details or include unwanted objects; use a clearer single-subject photo, retain the background, or import a PNG already cut out to get the desired result.
 
 ## X11, Wayland and multiple screens
 
 | Session | Movement and screen collisions | Landing on windows |
 | --- | --- | --- |
 | Xorg / X11 | Supported | Visible X11 windows |
-| GNOME Wayland with XWayland | Supported using Qt `xcb` | XWayland windows by default; native Wayland windows with optional bridge |
+| GNOME Wayland with XWayland | Supported using Qt `xcb` | XWayland windows; optional native-window bridge is experimental and unverified |
 | Wayland without XWayland / `DISPLAY` | Cannot run desktop pets | Unavailable |
 
-Check your session with `echo "$XDG_SESSION_TYPE"`. Wayland does not expose native applications' positions directly to this X11 app. The optional GNOME Shell geometry bridge below supplies read-only positions from the compositor. If your login screen offers **Ubuntu on Xorg**, choosing it enables detection of all X11 windows. Some newer Ubuntu installations do not offer that session. Use XWayland there; installing `xwayland` can require logout and login before `DISPLAY` appears.
+Check your session with `echo "$XDG_SESSION_TYPE"`. Wayland does not expose native applications' positions directly to this X11 app. An experimental GNOME Shell geometry bridge is included below, but native Wayland window interaction has not been verified and is excluded from v1.2.0 completion. If your login screen offers **Ubuntu on Xorg**, choosing it enables detection of all X11 windows. Some newer Ubuntu installations do not offer that session. Use XWayland there; installing `xwayland` can require logout and login before `DISPLAY` appears.
 
 Pets land on exposed portions of window tops, ride a moving supporting window and fall when it is minimized, closed or leaves the active workspace. Window interaction can use top platforms or solid sides according to the control-room option. The screen boundary uses the full display geometry, so pets can reach the physical display edge rather than stopping at the reserved desktop work area. Partially covered windows retain their exposed landing edges. Drag pets to another display; **全員回家** recovers pets and toys to the screen under the pointer. Screen-name matching with RandR maps collision edges into Qt coordinates on differently scaled displays; older servers fall back to the main display's scale. If a compositor reports inconsistent coordinates, disable **與視窗互動（落地 / 跟隨移動）**; screen collisions remain available.
 
 ## Optional GNOME native-window interaction
 
-On GNOME Shell 45–50, an optional companion extension lets pets interact with native Wayland window geometry as well as XWayland windows. The pet itself continues to use XWayland for positionable transparent windows; this is not a switch to a native Wayland renderer.
+The optional companion extension targets GNOME Shell 45–50 and attempts to expose native Wayland window geometry. **Its live native Wayland interaction is not verified.** Installing or enabling it is optional and outside the v1.2.0 completion scope; normal XWayland operation does not require it. The pet itself continues to use XWayland for positionable transparent windows; this is not a switch to a native Wayland renderer.
 
 From the source or updated package folder:
 
@@ -186,7 +178,7 @@ Run `bash start.sh --doctor`. It checks required shared libraries, the actual X1
 
 ## Settings, updates and removal
 
-Normal settings are stored in `~/.local/share/DesktopPets/WhyTheMouseJumpOntoMyHead67/`, or the equivalent directory beneath `$XDG_DATA_HOME`. This contains `settings.json` and imported image copies. On the first launch after renaming, supported legacy Naiwa settings are migrated; the old directory is retained. The portable chat launcher uses the same layout inside its `data/` folder.
+Normal settings are stored in `~/.local/share/DesktopPets/WhyTheMouseJumpOntoMyHead67/`, or the equivalent directory beneath `$XDG_DATA_HOME`. This contains `settings.json` and imported image copies. On the first launch after renaming, supported legacy Naiwa settings are migrated; the old directory is retained. Portable copies using `launch.sh` use the same layout inside their `data/` folder.
 
 Quit before updating. Extract a new package into a separate folder and register its shortcut. With source updates, rerun `--setup` when requirements change. Back up the whole settings directory to retain custom characters, rather than only `settings.json`.
 
@@ -196,7 +188,7 @@ Remove the menu shortcut with:
 bash start.sh --remove-desktop
 ```
 
-Then delete the application folder if no longer needed. Standard settings remain until explicitly removed. Deleting this chat's portable folder also deletes its local settings and imported copies.
+Then delete the application folder if no longer needed. Standard settings remain until explicitly removed. Deleting a portable application folder also deletes any local `data/` settings and imported copies inside it.
 
 ## Maintainer verification and packaging
 
@@ -214,4 +206,4 @@ xvfb-run -a -s "-screen 0 1280x800x24" env QT_QPA_PLATFORM=xcb .venv/bin/python 
 
 `offscreen` verifies logic only; it is not evidence of a visible desktop window. Startup screenshot verification requires `xcb` and a working graphical display. GNOME may move synthetic test windows, so Xvfb is preferable for deterministic native-window tests.
 
-Run `bash build-linux.sh --with-ai` on an X11/XWayland desktop to install development and inference dependencies, download the model, build once, verify the packaged app and create an AI-enabled Linux archive. `bash build-linux.sh` includes AI when its runtime/model have already been installed, and otherwise produces a smaller package requiring separate source AI setup. The package includes this guide and the setup helper. CI performs packaged verification on Xvfb; that proves X11 integration. Native Wayland interaction additionally requires enabling the GNOME extension in a real GNOME session and confirming its bridge status.
+Run `bash build-linux.sh --with-ai` on an X11/XWayland desktop to install development and inference dependencies, download the model, build once, verify the packaged app and create an AI-enabled Linux archive. `bash build-linux.sh` includes AI when its runtime/model have already been installed, and otherwise produces a smaller package requiring separate source AI setup. The package includes this guide and the setup helper. CI performs packaged verification on Xvfb; that proves X11 integration. Native Wayland interaction remains unverified; enabling the GNOME extension and confirming its bridge status in a real GNOME session are necessary future validation steps.
